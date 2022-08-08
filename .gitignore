@@ -1,0 +1,13 @@
+**/*.jpg
+.idea/
+FarImage/
+linearImage/
+Model_dict/
+NAVI_test_code/
+TempImage/
+TestImage/
+TrainImage/
+temp.py
+OpticalFlow.py
+Note
+*.csv
