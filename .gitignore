@@ -8,6 +8,6 @@ TempImage/
 TestImage/
 TrainImage/
 temp.py
-OpticalFlow.py
 Note
 *.csv
+*.npy
