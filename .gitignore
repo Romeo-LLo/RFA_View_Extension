@@ -1,13 +1,6 @@
-**/*.jpg
-.idea/
-FarImage/
-linearImage/
+
+All_Images/
+Code-NAVI/
 Model_dict/
-NAVI_test_code/
-TempImage/
-TestImage/
-TrainImage/
 temp.py
 Note
-*.csv
-*.npy
