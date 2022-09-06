@@ -9,8 +9,13 @@ from scipy.signal import argrelextrema, find_peaks
 import bisect
 from bresenham import bresenham
 from needle_utils import *
-
-pixel_thres = 50
+from smooth_differentiator import holo_diff
+from sklearn.cluster import DBSCAN
+from collections import Counter
+# pixel distance between peak
+pixel_lower_thres = 10
+pixel_upper_thres = 80
+# 1st deriv to be considered as edge
 peak_lower_bound = 20
 peak_upper_bound = 60
 window = 8
@@ -39,8 +44,6 @@ def line_differentiator_dispaly(color_img, dilation, lines):
     plt.grid(which='minor', color='#EEEEEE', linewidth=0.8)
     plt.minorticks_on()
 
-    #
-
 
     plt.subplot(2, 1, 2)
     plt.plot(pt_index, d_pixel, color='tab:blue', label='grdient')
@@ -68,6 +71,66 @@ def line_differentiator_dispaly(color_img, dilation, lines):
     return pt_set, pixel, d_pixel
 
 
+def single_line_differentiator_dispaly(gray, dilation, lines):
+    rho = lines[0][0]
+    theta = lines[0][1]
+
+    a = math.cos(theta)
+    b = math.sin(theta)
+    x0 = a * rho
+    y0 = b * rho
+    pt1 = (int(x0 + 1000 * (-b)), int(y0 + 1000 * (a)))
+    pt2 = (int(x0 - 1000 * (-b)), int(y0 - 1000 * (a)))
+
+    img_clone = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+
+
+    end_pts = line_end_points_on_image(rho, theta, dilation.shape, False)
+    pt_set = list(bresenham(end_pts[0][0], end_pts[0][1], end_pts[1][0], end_pts[1][1]))
+    # pt_set = pt_set[1::2]
+    pt_set = np.array(pt_set)
+
+
+    pixel = [dilation[pt[1], pt[0]] for pt in pt_set]
+    d_pixel = np.gradient(pixel)
+    pt_index = np.linspace(1, len(pixel), len(pixel))
+
+    pos_target, neg_target, pos_peaks_arr, neg_peaks_arr = edge_checker_display(pt_set, d_pixel)
+
+    for i in range(len(pt_index)):
+        if i % 40 == 0:
+            cv2.circle(img_clone, (pt_set[i][0], pt_set[i][1]), 2, (0, 0, 255), -1)
+
+            cv2.putText(img_clone, str(i), (pt_set[i][0], pt_set[i][1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+
+    cv2.imshow('line', img_clone)
+    cv2.waitKey(0)
+
+    plt.subplot(2, 1, 1)
+    plt.plot(pt_index, pixel, color='black', label='True', linestyle='--')
+    plt.grid(which='major', color='#DDDDDD', linewidth=0.8)
+    plt.grid(which='minor', color='#EEEEEE', linewidth=0.8)
+    plt.minorticks_on()
+
+    #
+
+    plt.subplot(2, 1, 2)
+    plt.plot(pt_index, d_pixel, color='tab:blue', label='grdient')
+    plt.vlines(pt_index[pos_target], color='red', ymin=-line_height_target, ymax=line_height_target)  # vertical
+    plt.vlines(pt_index[neg_target], color='limegreen', ymin=-line_height_target, ymax=line_height_target)  # vertical
+    #
+    plt.vlines(pt_index[pos_peaks_arr], color='lightsalmon', ymin=-line_height, ymax=line_height)  # vertical
+    plt.vlines(pt_index[neg_peaks_arr], color='springgreen', ymin=-line_height, ymax=line_height)  # vertical
+    plt.grid(which='major', color='#DDDDDD', linewidth=0.8)
+    plt.grid(which='minor', color='#EEEEEE', linewidth=0.8)
+    plt.minorticks_on()
+    plt.show()
+
+
+
+    return pt_set, pixel, d_pixel
+
+
 
 def edge_checker_display(pt_set, first_d):
 
@@ -82,14 +145,11 @@ def edge_checker_display(pt_set, first_d):
     if len(pos_target) == 0 or len(neg_target) == 0:
         return [], [], pos_peaks_arr, neg_peaks_arr
 
-    # if (len(pos_target) + len(pos_peaks)) <= 1:
-    #     return [], []
-
     while len(pos_peaks) > 0 and len(neg_peaks) > 0 and len(pos_target) < 3 and len(pos_target) > 0:
         pending_dist = pixel_distance(pt_set, pos_peaks[0], neg_peaks[0])
         adding_dist = pixel_distance(pt_set, neg_peaks[0], pos_target[-1])
 
-        if pending_dist < pixel_thres and adding_dist < pixel_thres:
+        if pending_dist < pixel_upper_thres and pending_dist > pixel_lower_thres and adding_dist < pixel_upper_thres and adding_dist > pixel_lower_thres:
             pos_target.append(pos_peaks.pop(0))
             neg_target.append(neg_peaks.pop(0))
         else:
@@ -97,8 +157,88 @@ def edge_checker_display(pt_set, first_d):
 
     return pos_target, neg_target, pos_peaks_arr, neg_peaks_arr
 
+def coordinate_generator(pt_set, target):
+    pts_one_line = np.empty((0, 2))
+    for index in target:
+        pt = np.array([[pt_set[index][0], pt_set[index][1]]])
+        pts_one_line = np.concatenate([pts_one_line, pt])
+
+        # cluster += [[pt_set[index][0], pt_set[index][1]]]
+    # print(np.expand_dims(pts_one_line, axis=0))
+    return np.expand_dims(pts_one_line, axis=0)
+    # print(pts_one_line)
+    # return pts_one_line
 
 
+
+def center_pt_generator(pos_coord, neg_coord):
+    pt_coord = np.concatenate([pos_coord, neg_coord], axis=1)
+    center_pt = np.mean(pt_coord, axis=1)
+    center_pt = center_pt.astype(int)
+
+    return center_pt
+
+
+def center_pt_cluster(center_coord_cluster):
+    clustering = DBSCAN(eps=10, min_samples=2).fit(center_coord_cluster)
+    labels = clustering.labels_
+    counts = Counter(labels)
+    most_common_class = counts.most_common(1)[0][0]
+    target_index = np.where(labels == most_common_class)
+
+
+    return target_index
+
+def pos_cluster_dispaly(pos_coord_cluster, pos_hc, color_img):
+    color_set = [(0, 0, 255), (255, 0, 255), (0, 255, 0), (0, 255, 255), (255, 255, 0), (0, 255, 0), (0, 255, 255), (255, 255, 0)]
+    for coord, cluster in zip(pos_coord_cluster, pos_hc):
+        color_img = cv2.circle(color_img, (coord[0], coord[1]), 2, color_set[cluster], -1)
+
+    return color_img
+
+
+def neg_cluster_dispaly(neg_coord_cluster, neg_hc, color_img):
+    color_set = [(0, 255, 255), (255, 255, 0), (0, 255, 0), (0, 255, 255), (255, 255, 0)]
+    for coord, cluster in zip(neg_coord_cluster, neg_hc):
+        color_img = cv2.circle(color_img, (coord[0], coord[1]), 2, color_set[cluster], -1)
+
+    return color_img
+
+
+def avg_pts(coord_cluster, hc):
+    for i in range(3):
+        cluster_index = np.where(hc == i)
+        cluster = coord_cluster[cluster_index]
+        cluster_mean = np.mean(cluster, axis=0).astype(int)
+        print(cluster_mean)
+
+# def hc_display():
+
+    # color_img = pos_cluster_dispaly(pos_coord_cluster, pos_hc, color_img)
+    # color_img = neg_cluster_dispaly(neg_coord_cluster, neg_hc, color_img)
+    #
+    # dendrogram = sch.dendrogram(sch.linkage(pos_coord_cluster, method='ward'))
+    # plt.title('Dendrogram')  # title of the dendrogram
+    # plt.xlabel('Customers')  # label of the x-axis
+    # plt.ylabel('Euclidean distances')  # label of the y-axis
+    # plt.show()  #
+    # cv2.imshow('circle', color_img)
+    # cv2.waitKey(0)
+
+    # Agg_hc = AgglomerativeClustering(n_clusters=3, affinity='euclidean', linkage='ward')
+    # pos_hc = Agg_hc.fit_predict(pos_coord_cluster)  # model fitting on the dataset
+    # neg_hc = Agg_hc.fit_predict(neg_coord_cluster)  # model fitting on the dataset
+    # avg_pts(pos_coord_cluster, pos_hc)
+
+def rough_edge_display(pt_set, pos_target, neg_target, color_img, j):
+    color_set = [(0, 0, 255), (255, 0, 255), (0, 255, 0), (0, 255, 255), (255, 255, 0), (0, 255, 0), (0, 255, 255), (255, 255, 0)]
+
+    for i, index in enumerate(pos_target):
+        color_img = cv2.circle(color_img, (pt_set[index][0], pt_set[index][1]), 2, color_set[0], -1)
+    for i, index in enumerate(neg_target):
+        color_img = cv2.circle(color_img, (pt_set[index][0], pt_set[index][1]), 2, color_set[2], -1)
+
+    return color_img
 
 
 def line_fit_and_refine_display(pos_target, neg_target, pt_set, gray_img, color_img):

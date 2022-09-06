@@ -12,12 +12,15 @@ def scale_estimation(q1, q2, q3, d1, d2, mtx, dist):
     # xp = mtx[0][2] * x_scale
     # yp = mtx[1][2] * y_scale
     f = 8
+
     scale = np.array([x_scale, y_scale, 0])
     trans = np.array([mtx[0][2], mtx[1][2], 0])
+
+
+
     q1 -= trans
     q2 -= trans
     q3 -= trans
-
 
     q1 *= scale
     q2 *= scale
@@ -63,18 +66,18 @@ def scale_estimation(q1, q2, q3, d1, d2, mtx, dist):
     p2 = 0.1 * (F + v2 * s2) * np.array([-1, -1, 1])
     p3 = 0.1 * (F + v3 * s3) * np.array([-1, -1, 1])
 
-    print(p1)
-    print(p2)
-    print(p3)
+    # print(p1)
+    # print(p2)
+    # print(p3)
     g1 = np.linalg.norm((p1 - p2), axis=0)
     g2 = np.linalg.norm((p2 - p3), axis=0)
 
 
     # print("{}   {}   {}".format(p1 * 0.1, p2 *0.1, p3*0.1))
 
-    unit = (p2 - p1) / np.linalg.norm((p2 - p1), axis=0)
-    le = p1 + unit * 28
-    # print(le)
+    unit = (p1 - p2) / np.linalg.norm((p1 - p2), axis=0)
+    le = p3 + unit * 21
+    print(le)
 
     return le
 

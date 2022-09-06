@@ -11,7 +11,8 @@ import bisect
 import cv2.aruco as aruco
 from bresenham import bresenham
 
-pixel_thres = 50
+pixel_lower_thres = 20
+pixel_upper_thres = 50
 peak_lower_bound = 20
 peak_upper_bound = 60
 window = 8
@@ -125,7 +126,7 @@ def init(pt_set, pos_peaks, neg_peaks):
         return [], [], pos_peaks, neg_peaks
     pos_target.append(pos_peaks.pop(0))
     while neg_peaks[0] < pos_target[0]:
-        if pixel_distance(pt_set, pos_target[0], neg_peaks[0]) < pixel_thres:
+        if pixel_distance(pt_set, pos_target[0], neg_peaks[0]) < pixel_upper_thres and pixel_distance(pt_set, pos_target[0], neg_peaks[0]) > pixel_lower_thres:
             if len(neg_target) == 0:
                 neg_target.append(neg_peaks.pop(0))
             else:
@@ -216,15 +217,30 @@ def rough_edge(pt_set, pos_target, neg_target, color_img):
     return color_img
 
 
-def edge_suppression(img):
-    len = 10
-    kernel = np.ones((len, len), np.uint8)
+def edge_suppression(img, kernel_len):
+
+
+    kernel = np.ones((kernel_len, kernel_len), np.uint8)
     dilation = cv2.dilate(img, kernel, iterations=1)
 
-    # cv2.imshow('img', dilation)
-    # cv2.waitKey( 0)
+    cv2.imshow('img', dilation)
+    cv2.waitKey(0)
 
     return dilation
+
+def edge_suppression_erosion(img):
+
+    len = 15
+    kernel = np.ones((len, len), np.uint8)
+    img1 = cv2.dilate(img, kernel, iterations=1)
+    img2 = cv2.erode(img, kernel, iterations=1)
+
+
+    cv2.imshow('img', img1)
+    cv2.waitKey(0)
+
+    return img
+
 
 
 def polar2cartesian(rho: float, theta_rad: float, rotate90: bool = False):
