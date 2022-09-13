@@ -13,7 +13,7 @@ from smooth_differentiator import holo_diff
 from sklearn.cluster import DBSCAN
 from collections import Counter
 # pixel distance between peak
-pixel_lower_thres = 10
+pixel_lower_thres = 20
 pixel_upper_thres = 80
 # 1st deriv to be considered as edge
 peak_lower_bound = 20
@@ -95,36 +95,36 @@ def single_line_differentiator_dispaly(gray, dilation, lines):
     d_pixel = np.gradient(pixel)
     pt_index = np.linspace(1, len(pixel), len(pixel))
 
-    pos_target, neg_target, pos_peaks_arr, neg_peaks_arr = edge_checker_display(pt_set, d_pixel)
+    # pos_target, neg_target, pos_peaks_arr, neg_peaks_arr = edge_checker_display(pt_set, d_pixel)
 
-    for i in range(len(pt_index)):
-        if i % 40 == 0:
-            cv2.circle(img_clone, (pt_set[i][0], pt_set[i][1]), 2, (0, 0, 255), -1)
-
-            cv2.putText(img_clone, str(i), (pt_set[i][0], pt_set[i][1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
-
-    cv2.imshow('line', img_clone)
-    cv2.waitKey(0)
-
-    plt.subplot(2, 1, 1)
-    plt.plot(pt_index, pixel, color='black', label='True', linestyle='--')
-    plt.grid(which='major', color='#DDDDDD', linewidth=0.8)
-    plt.grid(which='minor', color='#EEEEEE', linewidth=0.8)
-    plt.minorticks_on()
-
+    # for i in range(len(pt_index)):
+    #     if i % 40 == 0:
+    #         cv2.circle(img_clone, (pt_set[i][0], pt_set[i][1]), 2, (0, 0, 255), -1)
     #
+    #         cv2.putText(img_clone, str(i), (pt_set[i][0], pt_set[i][1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
 
-    plt.subplot(2, 1, 2)
-    plt.plot(pt_index, d_pixel, color='tab:blue', label='grdient')
-    plt.vlines(pt_index[pos_target], color='red', ymin=-line_height_target, ymax=line_height_target)  # vertical
-    plt.vlines(pt_index[neg_target], color='limegreen', ymin=-line_height_target, ymax=line_height_target)  # vertical
+    # cv2.imshow('line', img_clone)
+    # cv2.waitKey(0)
+
+    # plt.subplot(2, 1, 1)
+    # plt.plot(pt_index, pixel, color='black', label='True', linestyle='--')
+    # plt.grid(which='major', color='#DDDDDD', linewidth=0.8)
+    # plt.grid(which='minor', color='#EEEEEE', linewidth=0.8)
+    # plt.minorticks_on()
     #
-    plt.vlines(pt_index[pos_peaks_arr], color='lightsalmon', ymin=-line_height, ymax=line_height)  # vertical
-    plt.vlines(pt_index[neg_peaks_arr], color='springgreen', ymin=-line_height, ymax=line_height)  # vertical
-    plt.grid(which='major', color='#DDDDDD', linewidth=0.8)
-    plt.grid(which='minor', color='#EEEEEE', linewidth=0.8)
-    plt.minorticks_on()
-    plt.show()
+    # #
+    #
+    # plt.subplot(2, 1, 2)
+    # plt.plot(pt_index, d_pixel, color='tab:blue', label='grdient')
+    # plt.vlines(pt_index[pos_target], color='red', ymin=-line_height_target, ymax=line_height_target)  # vertical
+    # plt.vlines(pt_index[neg_target], color='limegreen', ymin=-line_height_target, ymax=line_height_target)  # vertical
+    # #
+    # plt.vlines(pt_index[pos_peaks_arr], color='lightsalmon', ymin=-line_height, ymax=line_height)  # vertical
+    # plt.vlines(pt_index[neg_peaks_arr], color='springgreen', ymin=-line_height, ymax=line_height)  # vertical
+    # plt.grid(which='major', color='#DDDDDD', linewidth=0.8)
+    # plt.grid(which='minor', color='#EEEEEE', linewidth=0.8)
+    # plt.minorticks_on()
+    # plt.show()
 
 
 
@@ -133,6 +133,8 @@ def single_line_differentiator_dispaly(gray, dilation, lines):
 
 
 def edge_checker_display(pt_set, first_d):
+    peak_upper_bound = np.amax(first_d)
+    peak_lower_bound = peak_upper_bound * 0.5
 
     pos_peaks_arr, _ = find_peaks(first_d, height=(peak_lower_bound, peak_upper_bound))
     neg_peaks_arr, _ = find_peaks(-first_d, height=(peak_lower_bound, peak_upper_bound))

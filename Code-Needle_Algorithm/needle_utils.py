@@ -13,7 +13,7 @@ from bresenham import bresenham
 
 pixel_lower_thres = 20
 pixel_upper_thres = 50
-peak_lower_bound = 20
+peak_lower_bound = 10
 peak_upper_bound = 60
 window = 8
 line_height = 50
@@ -223,8 +223,8 @@ def edge_suppression(img, kernel_len):
     kernel = np.ones((kernel_len, kernel_len), np.uint8)
     dilation = cv2.dilate(img, kernel, iterations=1)
 
-    cv2.imshow('img', dilation)
-    cv2.waitKey(0)
+    # cv2.imshow('img', dilation)
+    # cv2.waitKey(0)
 
     return dilation
 

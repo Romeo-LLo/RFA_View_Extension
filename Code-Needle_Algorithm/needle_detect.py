@@ -119,7 +119,7 @@ def needle_detect():
             print("No lines detected!")
 def needle_detect_each_line():
     mtx, dist = camera_para_retrieve()
-    img_dir = '../All_Images/needle_detect_realtime_Img'
+    img_dir = '../All_Images/needle_detect_white_Img'
     imgs_set = glob.glob(os.path.join(img_dir, '*.jpg'))
     for i in range(len(imgs_set)):
 
@@ -133,8 +133,6 @@ def needle_detect_each_line():
             aruco_detect = True
             gray = generate_mask(diamondCorners, gray)
 
-        for i in range()
-        dilation = edge_suppression_erosion(gray)
 
         edges = cv2.Canny(gray, 50, 150, apertureSize=3)
         lines = cv2.HoughLines(edges, 1, np.pi / 180, 200)
@@ -146,22 +144,25 @@ def needle_detect_each_line():
 
         if lines is not None:
             for j, line in enumerate(lines):
-                pt_set, pixel, deriv = single_line_differentiator_dispaly(dilation, dilation, line)
-                pos_target, neg_target, pos_peaks_arr, neg_peaks_arr = edge_checker_display(pt_set, deriv)
+                for k in range(3):
+                    kernel_len = k * 4 + 8
+                    dilation = edge_suppression(gray, kernel_len)
+                    cv2.imshow('circle', dilation)
+                    cv2.waitKey(0)
 
-                print(len(pos_target))
+                    pt_set, pixel, deriv = single_line_differentiator_dispaly(dilation, dilation, line)
+                    pos_target, neg_target, pos_paks_arr, neg_peaks_arr = edge_checker_display(pt_set, deriv)
+                    if len(pos_target) <= 2:
+                        continue
+                    else:
+                        do_cluster = True
+                        pos_pts_one_line = coordinate_generator(pt_set, pos_target)
+                        neg_pts_one_line = coordinate_generator(pt_set, neg_target)
+                        center_pt = center_pt_generator(pos_pts_one_line, neg_pts_one_line)
 
-                if len(pos_target) <= 2:
-                    continue
-                else:
-                    do_cluster = True
-                    pos_pts_one_line = coordinate_generator(pt_set, pos_target)
-                    neg_pts_one_line = coordinate_generator(pt_set, neg_target)
-                    center_pt = center_pt_generator(pos_pts_one_line, neg_pts_one_line)
-
-                    pos_pts_all_lines = np.concatenate([pos_pts_all_lines, pos_pts_one_line])
-                    neg_pts_all_lines = np.concatenate([neg_pts_all_lines, neg_pts_one_line])
-                    center_coord_cluster = np.concatenate([center_coord_cluster, center_pt])
+                        pos_pts_all_lines = np.concatenate([pos_pts_all_lines, pos_pts_one_line])
+                        neg_pts_all_lines = np.concatenate([neg_pts_all_lines, neg_pts_one_line])
+                        center_coord_cluster = np.concatenate([center_coord_cluster, center_pt])
 
 
             if do_cluster:
@@ -185,12 +186,12 @@ def needle_detect_each_line():
         #         if aruco_detect:
         #             print(tvec)
 
-                # for coord in pos_coord_mean.squeeze(axis=0):
-                #     color_img = cv2.circle(color_img, (coord[0], coord[1]), 2, [0, 255, 0], -1)
-                # for coord in neg_coord_mean.squeeze(axis=0):
-                #     color_img = cv2.circle(color_img, (coord[0], coord[1]), 2, [0, 0, 255], -1)
-                # cv2.imshow('circle', color_img)
-                # cv2.waitKey(0)
+                for coord in pos_coord_mean:
+                    color_img = cv2.circle(color_img, (int(coord[0]), int(coord[1])), 2, [0, 255, 0], -1)
+                for coord in neg_coord_mean:
+                    color_img = cv2.circle(color_img, (int(coord[0]), int(coord[1])), 2, [0, 0, 255], -1)
+                cv2.imshow('circle', color_img)
+                cv2.waitKey(0)
         # else:
         #     print("No lines detected!")
 def needle_detect_realtime():
@@ -206,71 +207,71 @@ def needle_detect_realtime():
             start = time.time()
             color_img = cv2.flip(frame, 0)
             gray = cv2.cvtColor(color_img, cv2.COLOR_BGR2GRAY)
-            dilation = edge_suppression(gray)
+            dilation = edge_suppression(gray, 10)
 
-            diamondCorners, rvec, tvec = diamond_detection(gray, mtx, dist)
-            if diamondCorners != None:
-                aruco_detect = True
-                dilation = generate_mask(diamondCorners, dilation)
-                gray = generate_mask(diamondCorners, gray)
-
-            edges = cv2.Canny(gray, 50, 150, apertureSize=3)
-            lines = cv2.HoughLines(edges, 1, np.pi / 180, 200)
-
-            pos_pts_all_lines = np.empty((0, 3, 2), dtype=int)
-            neg_pts_all_lines = np.empty((0, 3, 2), dtype=int)
-            center_coord_cluster = np.empty((0, 2), dtype=int)
-            do_cluster = False
-            if lines is not None:
-                for j, line in enumerate(lines):
-
-                    pt_set, pixel, deriv = single_line_differentiator_dispaly(dilation, dilation, line)
-                    pos_target, neg_target, pos_peaks_arr, neg_peaks_arr = edge_checker_display(pt_set, deriv)
-                    print(len(pos_peaks_arr))
-                    if len(pos_target) <= 2:
-                        continue
-                    else:
-                        do_cluster = True
-                        pos_pts_one_line = coordinate_generator(pt_set, pos_target)
-                        neg_pts_one_line = coordinate_generator(pt_set, neg_target)
-                        center_pt = center_pt_generator(pos_pts_one_line, neg_pts_one_line)
-
-                        pos_pts_all_lines = np.concatenate([pos_pts_all_lines, pos_pts_one_line])
-                        neg_pts_all_lines = np.concatenate([neg_pts_all_lines, neg_pts_one_line])
-                        center_coord_cluster = np.concatenate([center_coord_cluster, center_pt])
-
-                    if do_cluster:
-                        # to remove points that are not at same location
-                        target_index = center_pt_cluster(center_coord_cluster)
-                        pos_coord_cluster = pos_pts_all_lines[target_index, :, :]
-                        pos_coord_mean = np.mean(pos_coord_cluster, axis=1).squeeze(axis=0)
-                        neg_coord_cluster = neg_pts_all_lines[target_index, :, :]
-                        neg_coord_mean = np.mean(neg_coord_cluster, axis=1).squeeze(axis=0)
-
-                        for coord in pos_coord_mean:
-                            color_img = cv2.circle(color_img, (coord[0], coord[1]), 2, [0, 255, 0], -1)
-                        for coord in neg_coord_mean:
-                            color_img = cv2.circle(color_img, (coord[0], coord[1]), 2, [0, 0, 255], -1)
-
-                        pos_coord_mean_3D = []
-                        neg_coord_mean_3D = []
-                        for i in range(3):
-                            pt_pos = np.array([pos_coord_mean[i][0], pos_coord_mean[i][1], 0], dtype='float64')
-                            pt_neg = np.array([neg_coord_mean[i][0], neg_coord_mean[i][1], 0], dtype='float64')
-
-                            pos_coord_mean_3D.append(pt_pos)
-                            neg_coord_mean_3D.append(pt_neg)
-
-                        est_tvec = scale_estimation(pos_coord_mean_3D[0], pos_coord_mean_3D[1], pos_coord_mean_3D[2], 20, 20,
-                                                    mtx, dist)
-                        if aruco_detect:
-                            print(tvec)
+            # diamondCorners, rvec, tvec = diamond_detection(gray, mtx, dist)
+            # if diamondCorners != None:
+            #     aruco_detect = True
+            #     dilation = generate_mask(diamondCorners, dilation)
+            #     gray = generate_mask(diamondCorners, gray)
+            #
+            # edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+            # lines = cv2.HoughLines(edges, 1, np.pi / 180, 200)
+            #
+            # pos_pts_all_lines = np.empty((0, 3, 2), dtype=int)
+            # neg_pts_all_lines = np.empty((0, 3, 2), dtype=int)
+            # center_coord_cluster = np.empty((0, 2), dtype=int)
+            # do_cluster = False
+            # if lines is not None:
+            #     for j, line in enumerate(lines):
+            #
+            #         pt_set, pixel, deriv = single_line_differentiator_dispaly(dilation, dilation, line)
+            #         pos_target, neg_target, pos_peaks_arr, neg_peaks_arr = edge_checker_display(pt_set, deriv)
+            #         print(len(pos_peaks_arr))
+            #         if len(pos_target) <= 2:
+            #             continue
+            #         else:
+            #             do_cluster = True
+            #             pos_pts_one_line = coordinate_generator(pt_set, pos_target)
+            #             neg_pts_one_line = coordinate_generator(pt_set, neg_target)
+            #             center_pt = center_pt_generator(pos_pts_one_line, neg_pts_one_line)
+            #
+            #             pos_pts_all_lines = np.concatenate([pos_pts_all_lines, pos_pts_one_line])
+            #             neg_pts_all_lines = np.concatenate([neg_pts_all_lines, neg_pts_one_line])
+            #             center_coord_cluster = np.concatenate([center_coord_cluster, center_pt])
+            #
+            #         if do_cluster:
+            #             # to remove points that are not at same location
+            #             target_index = center_pt_cluster(center_coord_cluster)
+            #             pos_coord_cluster = pos_pts_all_lines[target_index, :, :]
+            #             pos_coord_mean = np.mean(pos_coord_cluster, axis=1).squeeze(axis=0)
+            #             neg_coord_cluster = neg_pts_all_lines[target_index, :, :]
+            #             neg_coord_mean = np.mean(neg_coord_cluster, axis=1).squeeze(axis=0)
+            #
+            #             for coord in pos_coord_mean:
+            #                 color_img = cv2.circle(color_img, (coord[0], coord[1]), 2, [0, 255, 0], -1)
+            #             for coord in neg_coord_mean:
+            #                 color_img = cv2.circle(color_img, (coord[0], coord[1]), 2, [0, 0, 255], -1)
+            #
+            #             pos_coord_mean_3D = []
+            #             neg_coord_mean_3D = []
+            #             for i in range(3):
+            #                 pt_pos = np.array([pos_coord_mean[i][0], pos_coord_mean[i][1], 0], dtype='float64')
+            #                 pt_neg = np.array([neg_coord_mean[i][0], neg_coord_mean[i][1], 0], dtype='float64')
+            #
+            #                 pos_coord_mean_3D.append(pt_pos)
+            #                 neg_coord_mean_3D.append(pt_neg)
+            #
+            #             est_tvec = scale_estimation(pos_coord_mean_3D[0], pos_coord_mean_3D[1], pos_coord_mean_3D[2], 20, 20,
+            #                                         mtx, dist)
+            #             if aruco_detect:
+            #                 print(tvec)
 
 
             pressedKey = cv2.waitKey(1) & 0xFF
             if pressedKey == ord('q'):
                 break
-            cv2.imshow("Image", color_img)
+            cv2.imshow("Image", dilation)
 
             end = time.time()
             process_time = end - start
