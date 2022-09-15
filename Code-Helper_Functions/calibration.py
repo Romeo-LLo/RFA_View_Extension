@@ -103,7 +103,7 @@ def read_chessboards(images):
     Charuco base pose estimation.
     """
     aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_1000)
-    board = aruco.CharucoBoard_create(9, 5, 4, 3.2, aruco_dict)
+    board = aruco.CharucoBoard_create(9, 5, 2.8, 2.2, aruco_dict)
 
     print("POSE ESTIMATION STARTS:")
     allCorners = []
@@ -142,7 +142,7 @@ def calibrate_camera(allCorners, allIds, imsize):
     """
     print("CAMERA CALIBRATION")
     aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_1000)
-    board = aruco.CharucoBoard_create(9, 5, 4, 3.2, aruco_dict)
+    board = aruco.CharucoBoard_create(9, 5, 2.8, 2.2, aruco_dict)
 
     cameraMatrixInit = np.array([[1000., 0., imsize[0] / 2.],
                                  [0., 1000., imsize[1] / 2.],

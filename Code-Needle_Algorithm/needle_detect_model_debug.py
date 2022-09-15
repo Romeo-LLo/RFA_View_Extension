@@ -54,11 +54,11 @@ predictor = DefaultPredictor(cfg)
 
 
 
-test_imgs = os.listdir("../All_image")
+test_imgs = os.listdir("../All_images")
 for i in range(len(test_imgs)):
 
     start = time.time()
-    im = cv2.imread(os.path.join("../All_image", test_imgs[i]))
+    im = cv2.imread(os.path.join("../All_images", test_imgs[i]))
     outputs = predictor(im)  # format is documented at https://detectron2.readthedocs.io/tutorials/models.html#model-output-format
     # keypoints = outputs["instances"].pred_keypoints
     # for i in range(10):
