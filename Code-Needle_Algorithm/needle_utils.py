@@ -4,12 +4,11 @@ import glob
 import os
 import math
 from matplotlib import pyplot as plt
-from noise_robust_differentiator import derivative_n2
 from matplotlib.patches import Circle
 from scipy.signal import argrelextrema, find_peaks
 import bisect
 import cv2.aruco as aruco
-from bresenham import bresenham
+# from bresenham import bresenham
 
 pixel_lower_thres = 20
 pixel_upper_thres = 50
