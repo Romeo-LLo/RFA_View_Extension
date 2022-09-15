@@ -48,7 +48,7 @@ def main():
     Tis = TIS.TIS()
     Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
 
-    Tis.Start_pipeline()  #
+    Tis.Start_pipeline()
 
     while True:
         if Tis.Snap_image(1) is True:

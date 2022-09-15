@@ -209,8 +209,9 @@ def needle_detect_realtime():
             gray = cv2.cvtColor(color_img, cv2.COLOR_BGR2GRAY)
             dilation = edge_suppression(gray, 10)
 
-            # diamondCorners, rvec, tvec = diamond_detection(gray, mtx, dist)
-            # if diamondCorners != None:
+            diamondCorners, rvec, tvec = diamond_detection(gray, mtx, dist)
+            if diamondCorners != None:
+                print(tvec)
             #     aruco_detect = True
             #     dilation = generate_mask(diamondCorners, dilation)
             #     gray = generate_mask(diamondCorners, gray)
@@ -271,7 +272,7 @@ def needle_detect_realtime():
             pressedKey = cv2.waitKey(1) & 0xFF
             if pressedKey == ord('q'):
                 break
-            cv2.imshow("Image", dilation)
+            cv2.imshow("Image", gray)
 
             end = time.time()
             process_time = end - start
@@ -285,8 +286,8 @@ def needle_detect_realtime():
 if __name__ == "__main__":
 
     # 跳動快的地方，做雜訊綠波
-    # needle_detect_realtime()
-    needle_detect_each_line()
+    needle_detect_realtime()
+    # needle_detect_each_line()
     # needle_detect()
     # needle_detect_raw()
 

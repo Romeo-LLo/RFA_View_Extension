@@ -20,8 +20,8 @@ class PhotoBoothApp:
         # the thread stop event
         # self.vs = vs
         self.cap = cap
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1024)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 768)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1440)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
         self.outputPath = outputPath
         self.frame = None
         self.thread = None
@@ -102,8 +102,8 @@ def read_chessboards(images):
     """
     Charuco base pose estimation.
     """
-    aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_250)
-    board = aruco.CharucoBoard_create(9, 5, 3, 2.4, aruco_dict)
+    aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_1000)
+    board = aruco.CharucoBoard_create(9, 5, 4, 3.2, aruco_dict)
 
     print("POSE ESTIMATION STARTS:")
     allCorners = []
@@ -141,8 +141,8 @@ def calibrate_camera(allCorners, allIds, imsize):
     Calibrates the camera using the dected corners.
     """
     print("CAMERA CALIBRATION")
-    aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_250)
-    board = aruco.CharucoBoard_create(9, 5, 3, 2.4, aruco_dict)
+    aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_1000)
+    board = aruco.CharucoBoard_create(9, 5, 4, 3.2, aruco_dict)
 
     cameraMatrixInit = np.array([[1000., 0., imsize[0] / 2.],
                                  [0., 1000., imsize[1] / 2.],
@@ -163,24 +163,28 @@ def calibrate_camera(allCorners, allIds, imsize):
         distCoeffs=distCoeffsInit,
         flags=flags,
         criteria=(cv2.TERM_CRITERIA_EPS & cv2.TERM_CRITERIA_COUNT, 10000, 1e-9))
+    print('mtx', camera_matrix)
+    print('dist', distortion_coefficients0)
+    print('rvec', rotation_vectors)
+    print('tvec', translation_vectors)
 
     return ret, camera_matrix, distortion_coefficients0, rotation_vectors, translation_vectors
 
 
 def photosnapshot():
     cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
-    calib_img_path = './needle_detect_Img'
+    calib_img_path = '../All_Images/calib_Img'
     pba = PhotoBoothApp(cap, calib_img_path)
     pba.root.mainloop()
 
 
 def calibration():
-    images = glob.glob('./calib_img/*.jpg')
+    images = glob.glob('../All_Images/calib_Img/*.jpg')
     allCorners, allIds, imsize = read_chessboards(images)
     ret, mtx, dist, rvecs, tvecs = calibrate_camera(allCorners,allIds,imsize)
-    np.save('./AUX273_mtx.npy', mtx)
-    np.save('./AUX273_dist.npy', dist)
+    np.save('../CameraParameter/AUX273_mtx.npy', mtx)
+    np.save('../CameraParameter/AUX273_dist.npy', dist)
 
 if __name__ == "__main__":
-    # calibration()
-    photosnapshot()
+    calibration()
+    # photosnapshot()
