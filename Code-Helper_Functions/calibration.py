@@ -103,7 +103,7 @@ def read_chessboards(images):
     Charuco base pose estimation.
     """
     aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_1000)
-    board = aruco.CharucoBoard_create(9, 5, 2.8, 2.2, aruco_dict)
+    board = aruco.CharucoBoard_create(9, 5, 3, 2.4, aruco_dict)
 
     print("POSE ESTIMATION STARTS:")
     allCorners = []
@@ -142,7 +142,7 @@ def calibrate_camera(allCorners, allIds, imsize):
     """
     print("CAMERA CALIBRATION")
     aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_1000)
-    board = aruco.CharucoBoard_create(9, 5, 2.8, 2.2, aruco_dict)
+    board = aruco.CharucoBoard_create(9, 5, 3, 2.4, aruco_dict)
 
     cameraMatrixInit = np.array([[1000., 0., imsize[0] / 2.],
                                  [0., 1000., imsize[1] / 2.],
@@ -173,17 +173,17 @@ def calibrate_camera(allCorners, allIds, imsize):
 
 def photosnapshot():
     cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
-    calib_img_path = '../All_Images/calib_Img'
+    calib_img_path = '../All_Images/calib_Img2'
     pba = PhotoBoothApp(cap, calib_img_path)
     pba.root.mainloop()
 
 
 def calibration():
-    images = glob.glob('../All_Images/calib_Img/*.jpg')
+    images = glob.glob('../All_Images/calib_Img2/*.jpg')
     allCorners, allIds, imsize = read_chessboards(images)
     ret, mtx, dist, rvecs, tvecs = calibrate_camera(allCorners,allIds,imsize)
-    np.save('../CameraParameter/AUX273_mtx.npy', mtx)
-    np.save('../CameraParameter/AUX273_dist.npy', dist)
+    np.save('../CameraParameter/AUX273_mtx2.npy', mtx)
+    np.save('../CameraParameter/AUX273_dist2.npy', dist)
 
 if __name__ == "__main__":
     calibration()
