@@ -4,7 +4,7 @@ setup_logger()
 
 import numpy as np
 import os, json, cv2, random
-
+import TIS
 # import some common detectron2 utilities
 from detectron2 import model_zoo
 from detectron2.engine import DefaultPredictor
@@ -37,12 +37,89 @@ gi.require_version("Gst", "1.0")
 
 from gi.repository import Gst
 
+def video():
+    mtx, dist = camera_para_retrieve()
+    cap = cv2.VideoCapture('../All_images/needle_test0915.mp4')
+    while cap.isOpened():
+        ret, frame = cap.read()
+        frame = undistort_img(frame, mtx, dist)
+        if not ret:
+            print('Fail')
+            break
 
-def main():
+        outputs = predictor(frame)
+        diamondCorners, rvec, tvec = diamond_detection(frame, mtx, dist)
+
+        kp = outputs["instances"].pred_keypoints.to("cpu").numpy()
+        if kp.shape[0] != 0:
+            for i in range(10):
+                cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
+                cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 2,
+                            (0, 0, 255), 1, cv2.LINE_AA)
+
+            coord_3D = []
+            for i in range(3):
+                pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
+                coord_3D.append(pt)
+
+            est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 32, 30, mtx, dist)
+
+            if diamondCorners != None:
+                print(int(tvec[0][0][2]), int(est_tvec[2]))
+
+            pressedKey = cv2.waitKey(1) & 0xFF
+            if pressedKey == ord('q'):
+                break
+            frameS = cv2.resize(frame, (720, 540))
+            cv2.imshow('Window', frameS)
+    cap.release()
+    cv2.destroyAllWindows()
+    print('Program ends')
+
+
+def frame():
+    mtx, dist = camera_para_retrieve()
+    cap = cv2.VideoCapture('../All_images/needle_test0915.mp4')
+    while cap.isOpened():
+        ret, frame = cap.read()
+        frame = undistort_img(frame, mtx, dist)
+
+        if not ret:
+            print('Fail')
+            break
+
+        outputs = predictor(frame)
+        diamondCorners, rvec, tvec = diamond_detection(frame, mtx, dist)
+
+        kp = outputs["instances"].pred_keypoints.to("cpu").numpy()
+        if kp.shape[0] != 0:
+            for i in range(10):
+                cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 5, (0, 255, 0), -1)
+                cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 2,
+                            (0, 0, 255), 1, cv2.LINE_AA)
+
+            coord_3D = []
+            for i in range(3):
+                pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
+                coord_3D.append(pt)
+
+            est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 32, 30, mtx, dist)
+
+            if diamondCorners != None:
+                print(int(tvec[0][0][2]), int(est_tvec[2]))
+
+                frameS = cv2.resize(frame, (720, 540))
+                cv2.imshow('Window', frameS)
+                cv2.waitKey(0)
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+
+def realtime():
     import sys
     # sys.path.append("../python-common")
-    import cv2
-    import TIS
+
     mtx, dist = camera_para_retrieve()
 
     Tis = TIS.TIS()
@@ -58,7 +135,6 @@ def main():
             outputs = predictor(frame)
             diamondCorners, rvec, tvec = diamond_detection(frame, mtx, dist)
 
-
             kp = outputs["instances"].pred_keypoints.to("cpu").numpy()
             if kp.shape[0] != 0:
                 for i in range(10):
@@ -73,8 +149,8 @@ def main():
                 est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 32, 30, mtx, dist)
                 # est_tvec_rev = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 15, 32, mtx, dist)
                 if diamondCorners != None:
-                    # print('gt', tvec)
-                    # print('est', est_tvec)
+                    print('gt', tvec)
+                    print('est', est_tvec)
                     # print('est2', est_tvec_rev)
                     print("------------------")
             pressedKey = cv2.waitKey(1) & 0xFF
@@ -86,4 +162,6 @@ def main():
     print('Program ends')
 
 if __name__ == "__main__":
-    main()
+    # realtime()
+    # video()
+    frame()

@@ -374,12 +374,9 @@ def error_calc(diamondCorners, image_points, rvec, tvec, rotation_vector, transl
 
 
 def undistort_img(img, mtx, dist):
-    h1, w1 = img.shape[:2]
 
     h, w = img.shape[:2]
     newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 0, (w, h))
-
-    # undistort
     dst = cv2.undistort(img, mtx, dist, None, newcameramtx)
 
     # crop the image

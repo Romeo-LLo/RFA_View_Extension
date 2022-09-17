@@ -19,8 +19,8 @@ line_height = 50
 line_height_target = 80
 
 def camera_para_retrieve():
-    mtx = np.load('../CameraParameter/AUX273_mtx.npy')
-    dist = np.load('../CameraParameter/AUX273_dist.npy')
+    mtx = np.load('../CameraParameter/AUX273_mtx2.npy')
+    dist = np.load('../CameraParameter/AUX273_dist2.npy')
 
     return mtx, dist
 
@@ -363,14 +363,23 @@ def contrast_enhance(image):
 
     return adjusted
 
-def undistorted(img, mtx, dist):
+# def undistort(img, mtx, dist):
+#
+#     h, w = img.shape[:2]
+#     newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
+#     undist = cv2.undistort(img, mtx, dist, None, newcameramtx)
+#     return undist
+
+def undistort_img(img, mtx, dist):
 
     h, w = img.shape[:2]
     newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
-    undist = cv2.undistort(img, mtx, dist, None, newcameramtx)
-    return undist
+    dst = cv2.undistort(img, mtx, dist, None, newcameramtx)
 
-
+    # crop the image
+    x, y, w, h = roi
+    dst = dst[y:y + h, x:x + w]
+    return dst
 
 def diamond_detection(img, mtx, dist):
     aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_50)
