@@ -83,33 +83,44 @@ def frame():
     while cap.isOpened():
         ret, frame = cap.read()
         frame = undistort_img(frame, mtx, dist)
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        diamondCorners, rvec, tvec = diamond_detection(frame, mtx, dist)
 
         if not ret:
             print('Fail')
             break
 
         outputs = predictor(frame)
-        diamondCorners, rvec, tvec = diamond_detection(frame, mtx, dist)
 
         kp = outputs["instances"].pred_keypoints.to("cpu").numpy()
         if kp.shape[0] != 0:
+
+            corners = np.array(kp[0, :-1, :2])
+            corners = np.float32(corners.astype(int))
+            rf_corners = corner_refinement(gray_frame, corners)
             for i in range(10):
-                cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 5, (0, 255, 0), -1)
-                cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
-                            (0, 0, 255), 1, cv2.LINE_AA)
+                cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 3, (0, 255, 0), -1)
+                cv2.circle(frame, (int(rf_corners[i][0]), int(rf_corners[i][1])), 2, (0, 0, 255), -1)
+
+                cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                            (0, 255, 255), 1, cv2.LINE_AA)
 
             coord_3D = []
-            for i in range(3):
+            rf_coord_3D = []
+
+            for i in range(1, 4):
                 pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
                 coord_3D.append(pt)
+                rf_pt = np.array([rf_corners[i][0], rf_corners[i][1], 0], dtype='float64')
+                rf_coord_3D.append(rf_pt)
 
-            est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 32, 30, mtx)
+            est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 30, 10, mtx)
+            rf_est_tvec = scale_estimation(rf_coord_3D[0], rf_coord_3D[1], rf_coord_3D[2], 30, 10, mtx)
 
             if diamondCorners != None:
                 trans_tvec = pose_trans_needle(tvec, rvec) #translation from marker to needle tip
-                print(trans_tvec[0], est_tvec)
-
-                frameS = cv2.resize(frame, (720, 540))
+                print(trans_tvec[0][2], est_tvec[2], rf_est_tvec[2])
+                frameS = cv2.resize(frame, (900, 675))
                 cv2.imshow('Window', frameS)
                 cv2.waitKey(0)
 

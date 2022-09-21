@@ -406,3 +406,13 @@ def pose_trans_needle(tvec, rvec):
     trans = np.matmul(r_matrix, np.array([[0], [21], [2.5]]))
     needle_tvec = tvec[0][0] + trans.T
     return needle_tvec
+
+
+def corner_refinement(src_gray, corners):
+    winSize = (5, 5)
+    zeroZone = (-1, -1)
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TermCriteria_COUNT, 40, 0.001)
+    # Calculate the refined corner locations
+    rf_corners = cv2.cornerSubPix(src_gray, corners, winSize, zeroZone, criteria)
+
+    return rf_corners
