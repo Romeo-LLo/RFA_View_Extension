@@ -62,7 +62,7 @@ def video():
                 pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
                 coord_3D.append(pt)
 
-            est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 32, 30, mtx, dist)
+            est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 32, 30, mtx)
 
             if diamondCorners != None:
                 print(int(tvec[0][0][2]), int(est_tvec[2]))
@@ -95,7 +95,7 @@ def frame():
         if kp.shape[0] != 0:
             for i in range(10):
                 cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 5, (0, 255, 0), -1)
-                cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 2,
+                cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
                             (0, 0, 255), 1, cv2.LINE_AA)
 
             coord_3D = []
@@ -103,10 +103,11 @@ def frame():
                 pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
                 coord_3D.append(pt)
 
-            est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 32, 30, mtx, dist)
+            est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 32, 30, mtx)
 
             if diamondCorners != None:
-                print(int(tvec[0][0][2]), int(est_tvec[2]))
+                trans_tvec = pose_trans_needle(tvec, rvec) #translation from marker to needle tip
+                print(trans_tvec[0], est_tvec)
 
                 frameS = cv2.resize(frame, (720, 540))
                 cv2.imshow('Window', frameS)
@@ -139,14 +140,14 @@ def realtime():
             if kp.shape[0] != 0:
                 for i in range(10):
                     cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
-                    cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 1, cv2.LINE_AA)
+                    cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
 
                 coord_3D = []
                 for i in range(3):
                     pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
                     coord_3D.append(pt)
 
-                est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 32, 30, mtx, dist)
+                est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 32, 30, mtx)
                 # est_tvec_rev = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 15, 32, mtx, dist)
                 if diamondCorners != None:
                     print('gt', tvec)

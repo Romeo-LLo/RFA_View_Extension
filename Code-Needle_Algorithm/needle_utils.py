@@ -400,3 +400,9 @@ def diamond_detection(img, mtx, dist):
             return None, None, None
     else:
         return None, None, None
+
+def pose_trans_needle(tvec, rvec):
+    r_matrix, _ = cv2.Rodrigues(rvec[0][0])
+    trans = np.matmul(r_matrix, np.array([[0], [21], [2.5]]))
+    needle_tvec = tvec[0][0] + trans.T
+    return needle_tvec

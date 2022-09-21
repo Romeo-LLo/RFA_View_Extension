@@ -4,9 +4,8 @@ from scipy.linalg import null_space
 # import cv2.aruco as aruco
 import cv2
 from needle_utils import camera_para_retrieve
-def scale_estimation(q1, q2, q3, d1, d2, mtx, dist):
+def scale_estimation(q1, q2, q3, d1, d2, mtx):
 
-    # mtx = np.array([[2433.68459290071, 0, 718.87372815422], [0, 2440.24567073231, 601.529413632018], [0, 0, 1]])
     x_scale = (3.45 / 1000)  # pixel size : 3.45 Micrometer = 0.00345 mm
     y_scale = (3.45 / 1000)
     # xp = mtx[0][2] * x_scale
@@ -15,8 +14,6 @@ def scale_estimation(q1, q2, q3, d1, d2, mtx, dist):
 
     scale = np.array([x_scale, y_scale, 0])
     trans = np.array([mtx[0][2], mtx[1][2], 0])
-
-
 
     q1 -= trans
     q2 -= trans
@@ -29,9 +26,9 @@ def scale_estimation(q1, q2, q3, d1, d2, mtx, dist):
 
     F = np.array([0, 0, f])
 
-    v1 = -(q1 - F) / np.linalg.norm((q1 - F), axis=0)
-    v2 = -(q2 - F) / np.linalg.norm((q2 - F), axis=0)
-    v3 = -(q3 - F) / np.linalg.norm((q3 - F), axis=0)
+    v1 = (F - q1) / np.linalg.norm((F - q1), axis=0)
+    v2 = (F - q2) / np.linalg.norm((F - q2), axis=0)
+    v3 = (F - q3) / np.linalg.norm((F - q3), axis=0)
 
     A = v1
     n = np.cross(v1, v2) / np.linalg.norm(np.cross(v1, v2), axis=0)
@@ -80,7 +77,7 @@ def scale_estimation(q1, q2, q3, d1, d2, mtx, dist):
     # print(le)
     # print('p', int(p1[2]), int(p2[2]), int(p3[2]), int(le[2]))
 
-    return le
+    return p1
 
 def aruco(frame, mtx, dist):
 
