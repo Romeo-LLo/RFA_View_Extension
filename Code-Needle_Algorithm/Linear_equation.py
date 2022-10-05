@@ -73,7 +73,7 @@ def scale_estimation(q1, q2, q3, d1, d2, mtx):
     # print("{}   {}   {}".format(p1 * 0.1, p2 *0.1, p3*0.1))
 
     unit = (p2 - p1) / np.linalg.norm((p2 - p1), axis=0)
-    le = p1 + unit * 21
+    # le = p1 + unit * 21
     # print(le)
     # print('p', int(p1[2]), int(p2[2]), int(p3[2]), int(le[2]))
 

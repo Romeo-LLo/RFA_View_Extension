@@ -403,7 +403,7 @@ def diamond_detection(img, mtx, dist):
 
 def pose_trans_needle(tvec, rvec):
     r_matrix, _ = cv2.Rodrigues(rvec[0][0])
-    trans = np.matmul(r_matrix, np.array([[0], [21], [2.5]]))
+    trans = np.matmul(r_matrix, np.array([[0], [18], [2.5]]))
     needle_tvec = tvec[0][0] + trans.T
     return needle_tvec
 
@@ -416,3 +416,29 @@ def corner_refinement(src_gray, corners):
     rf_corners = cv2.cornerSubPix(src_gray, corners, winSize, zeroZone, criteria)
 
     return rf_corners
+
+
+def line_fit(kp):
+    x = kp[0, :, 0]
+    y = kp[0, :, 1]
+    m, b = np.polyfit(x, y, 1)
+    # p = np.poly1d(coeff)
+    # p1, p2 = p(1), p(100) #dummy value
+
+    fit_kp = np.zeros((1, 10, 2))
+
+    for i in range(x.shape[0]):
+        x_fit = (m * y[i] + x[i] - m * b) / (m * m + 1)
+        y_fit = (m * m * y[i] + m * x[i] + b) / (m * m + 1)
+        fit_kp[0][i][0] = x_fit
+        fit_kp[0][i][1] = y_fit
+
+    return fit_kp
+
+
+def isMonotonic(A):
+    return (all(A[i] <= A[i + 1] for i in range(len(A) - 1)) or
+            all(A[i] >= A[i + 1] for i in range(len(A) - 1)))
+
+
+
