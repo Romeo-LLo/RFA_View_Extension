@@ -36,7 +36,7 @@ def click_event(event, x, y, flags, params):
 if __name__ == "__main__":
 
     # y 768 x 1024
-    img = cv2.imread('../All_Images/needle_detect_Img/2022-07-18_11-35-08.jpg')
+    img = cv2.imread('../All_images/algorithm_test/1.jpg')
     bt_size = 150
     button = [0, bt_size, img.shape[1], img.shape[1] + bt_size]  # y, x
 

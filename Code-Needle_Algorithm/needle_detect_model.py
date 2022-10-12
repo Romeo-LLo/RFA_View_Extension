@@ -138,10 +138,9 @@ def test_algorithm():
     mtx, dist = camera_para_retrieve()
     cap = cv2.VideoCapture('../All_images/needle_test0915.mp4')
 
-    wait_gt = True
     count = 0
     error = 0
-    while cap.isOpened() and wait_gt:
+    while cap.isOpened():
 
         ret, frame = cap.read()
         frame = undistort_img(frame, mtx, dist)
@@ -203,14 +202,14 @@ def test_algorithm():
             trans_tvec = pose_trans_needle(tvec, rvec) #translation from marker to needle tip
             trans_error = np.linalg.norm(trans_tvec[0] - est_tvec)
             count += 1
-            # cur_error = (np.array([[est_tvec[2], rf_est_tvec[2], fit_est_tvec[2]]]) - trans_tvec[0][2]) / trans_tvec[0][2]
-            # cur_error = np.absolute(cur_error)
+            cur_error = (np.array([[est_tvec[2], rf_est_tvec[2], fit_est_tvec[2]]]) - trans_tvec[0][2]) / trans_tvec[0][2]
+            cur_error = np.absolute(cur_error)
             error += trans_error
-            print(trans_error)
+            print(est_tvec)
 
-            # frameS = cv2.resize(frame, (900, 675))
-            # cv2.imshow('Window', frameS)
-            # cv2.waitKey(0)
+            frameS = cv2.resize(frame, (900, 675))
+            cv2.imshow('Window', frameS)
+            cv2.waitKey(0)
                 # wait_gt = False
 
     cap.release()
@@ -231,38 +230,54 @@ def realtime():
         if Tis.Snap_image(1) is True:
             frame = Tis.Get_image()
             frame = frame[:, :, :3]
-            frame = np.array(frame)
+            dis_frame = np.array(frame)
+            frame = undistort_img(dis_frame, mtx, dist)
+
+            diamondCorners, rvec, tvec = diamond_detection(dis_frame, mtx, dist)
+            if diamondCorners == None:
+                continue
             outputs = predictor(frame)
-            diamondCorners, rvec, tvec = diamond_detection(frame, mtx, dist)
+            kp_tensor = outputs["instances"].pred_keypoints
+            if kp_tensor.size(dim=0) == 0 or torch.isnan(kp_tensor).any():
+                continue
 
-            kp = outputs["instances"].pred_keypoints.to("cpu").numpy()
-            if kp.shape[0] != 0:
-                for i in range(10):
-                    cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
-                    cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
+            kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+            x = kp[0, :-1, 0]
+            y = kp[0, :-1, 1]
 
-                coord_3D = []
-                for i in range(3):
-                    pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
-                    coord_3D.append(pt)
+            if not isMonotonic(x) and not isMonotonic(y):
+                continue
+            # #
+            # for i in range(10):
+            #     cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
+            #     cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
 
-                est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 32, 30, mtx)
-                # est_tvec_rev = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 15, 32, mtx, dist)
-                if diamondCorners != None:
-                    print('gt', tvec)
-                    print('est', est_tvec)
-                    # print('est2', est_tvec_rev)
-                    print("------------------")
-            pressedKey = cv2.waitKey(1) & 0xFF
-            if pressedKey == ord('q'):
+            coord_3D = []
+            plist = [1, 2, 5]
+
+            for i in plist:
+                pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
+                coord_3D.append(pt)
+
+            est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 30, 50, mtx)
+            trans_tvec = pose_trans_needle(tvec, rvec) #translation from marker to needle tip
+
+            # print('gt', tvec)
+            print('gt', trans_tvec)
+            print('est', est_tvec)
+            print("------------------")
+            frameS = cv2.resize(frame, (900, 675))
+            cv2.imshow('Window', frameS)
+
+
+            if cv2.waitKey(1) == ord('q'):
                 break
-            cv2.imshow('Window', frame)
     Tis.Stop_pipeline()
     cv2.destroyAllWindows()
     print('Program ends')
 
 if __name__ == "__main__":
-    # realtime()
+    realtime()
     # video()
     # frame()
-    test_algorithm()
+    # test_algor+ithm()
