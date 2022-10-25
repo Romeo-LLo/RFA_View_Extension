@@ -4,11 +4,12 @@ import numpy as np
 import sys
 
 from needle_utils_temp import camera_para_retrieve, diamond_detection, pose_trans_needle
-from Linear_equation_temp import scale_estimation
+from Linear_equation_temp import scale_estimation, scale_estimation_4p
 # function to display the coordinates of
 # of the points clicked on the image
 
-coordinates = np.zeros((3, 3), dtype='float64')
+num_pt = 3
+coordinates = np.zeros((num_pt, 3), dtype='float64')
 index = 0
 
 def click_event(event, x, y, flags, params):
@@ -19,21 +20,25 @@ def click_event(event, x, y, flags, params):
             print('Evaluate!')
             coordinates_ready = coordinates.copy()
             print(coordinates_ready)
-            est_tvec = scale_estimation(coordinates_ready[0], coordinates_ready[1], coordinates_ready[2], 30, 52, mtx)
             print(trans_tvec[0])
+
+            est_tvec = scale_estimation(coordinates_ready[0], coordinates_ready[1], coordinates_ready[2], 30, 50, mtx)
             print(est_tvec)
-            trans_error = np.linalg.norm(trans_tvec[0] - est_tvec)
+            #
+            # est_tvec = scale_estimation_4p(coordinates_ready[0], coordinates_ready[1], coordinates_ready[2], coordinates_ready[3], 30, 20, 30, mtx)
+            # print(est_tvec)
+            trans_error = np.linalg.norm(trans_tvec - est_tvec)
             print(trans_error)
 
         if y > button2[0] and y < button2[1] and x > button2[2] and x < button2[3]:
             print("current index", index)
-            if index >= 2:
+            if index >= num_pt - 1:
                 index = 0
             else:
                 index += 1
             print("new index", index)
         if y > button3[0] and y < button3[1] and x > button3[2] and x < button3[3]:
-            coordinates = np.zeros((3, 3), dtype='float64')
+            coordinates = np.zeros((num_pt, 3), dtype='float64')
             # combine_img = window_init()
             index = 0
             print('Reset')
@@ -41,7 +46,7 @@ def click_event(event, x, y, flags, params):
 
     # checking for right mouse clicks
     if event == cv2.EVENT_RBUTTONDOWN:
-        if index > 2:
+        if index > 3:
             print('All labeled')
         else:
             coordinates[index] = np.array([x, y, 0], dtype='float64')
@@ -53,7 +58,7 @@ def click_event(event, x, y, flags, params):
         cv2.imshow('image', combine_img)
 
 def window_init():
-    img = cv2.imread('../All_images/algorithm_test/1.jpg')
+    img = cv2.imread('../All_images/16.jpg')
 
     bt_size = 150
 
@@ -76,7 +81,7 @@ def window_init():
 if __name__ == "__main__":
 
     # y 768 x 1024
-    img = cv2.imread('../All_images/algorithm_test/1.jpg')
+    img = cv2.imread('../All_images/algorithm_test/3.jpg')
 
     mtx, dist = camera_para_retrieve()
     diamondCorners, rvec, tvec = diamond_detection(img, mtx, dist)

@@ -21,7 +21,6 @@ line_height_target = 80
 def camera_para_retrieve():
     mtx = np.load('../CameraParameter/AUX273_mtx2.npy')
     dist = np.load('../CameraParameter/AUX273_dist2.npy')
-
     return mtx, dist
 
 

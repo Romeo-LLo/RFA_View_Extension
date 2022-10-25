@@ -22,11 +22,11 @@ cfg = get_cfg()
 
 cfg.MODEL.DEVICE = "cuda"
 cfg.merge_from_file(model_zoo.get_config_file("COCO-Keypoints/keypoint_rcnn_R_50_FPN_3x.yaml"))
-cfg.MODEL.WEIGHTS = 'model_final.pth'
+cfg.MODEL.WEIGHTS = 'model_final3.pth'
 cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7   # set a custom testing threshold
 cfg.TEST.DETECTIONS_PER_IMAGE = 1
-cfg.MODEL.ROI_KEYPOINT_HEAD.NUM_KEYPOINTS = 11
-cfg.TEST.KEYPOINT_OKS_SIGMAS = np.ones((11, 1), dtype=float).tolist()
+cfg.MODEL.ROI_KEYPOINT_HEAD.NUM_KEYPOINTS = 12
+cfg.TEST.KEYPOINT_OKS_SIGMAS = np.ones((12, 1), dtype=float).tolist()
 predictor = DefaultPredictor(cfg)
 
 
@@ -167,13 +167,13 @@ def test_algorithm():
         rf_corners = corner_refinement(gray_frame, corners)
         rf_corners = np.expand_dims(rf_corners, axis=0)
 
-        for i in range(10):
-            cv2.circle(frame, (round(kp[0][i][0]), round(kp[0][i][1])), 3, (0, 255, 0), -1)
-            cv2.circle(frame, (round(rf_corners[0][i][0]), round(rf_corners[0][i][1])), 3, (255, 0, 0), -1)
-            # cv2.circle(frame, (round(fit_kp[0][i][0]), round(fit_kp[0][i][1])), 1, (0, 0, 255), -1)
+        # for i in range(10):
+        #     cv2.circle(frame, (round(kp[0][i][0]), round(kp[0][i][1])), 3, (0, 255, 0), -1)
+        #     cv2.circle(frame, (round(rf_corners[0][i][0]), round(rf_corners[0][i][1])), 3, (255, 0, 0), -1)
+        #     # cv2.circle(frame, (round(fit_kp[0][i][0]), round(fit_kp[0][i][1])), 1, (0, 0, 255), -1)
 
-            cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1,
-                        (255, 0, 0), 1, cv2.LINE_AA)
+        #     cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1,
+        #                 (255, 0, 0), 1, cv2.LINE_AA)
 
 
         # plist = [[0, 1, 2], [1, 2, 3], [1, 2, 5]]
@@ -200,18 +200,18 @@ def test_algorithm():
             fit_est_tvec = scale_estimation(fit_coord_3D[0], fit_coord_3D[1], fit_coord_3D[2], llist[j][0], llist[j][1], mtx)
 
             trans_tvec = pose_trans_needle(tvec, rvec) #translation from marker to needle tip
-            trans_error = np.linalg.norm(trans_tvec[0] - est_tvec)
-            count += 1
-            cur_error = (np.array([[est_tvec[2], rf_est_tvec[2], fit_est_tvec[2]]]) - trans_tvec[0][2]) / trans_tvec[0][2]
-            cur_error = np.absolute(cur_error)
+            trans_error = np.linalg.norm(trans_tvec - est_tvec)
+            # cur_error = np.array([[est_tvec, rf_est_tvec, fit_est_tvec]]) - trans_tvec
+            # cur_error = np.absolute(cur_error)
             error += trans_error
-            print(est_tvec)
+            print(trans_tvec, est_tvec)
+            count += 1
+
 
             frameS = cv2.resize(frame, (900, 675))
             cv2.imshow('Window', frameS)
             cv2.waitKey(0)
-                # wait_gt = False
-
+    print('avg', error / count)
     cap.release()
     cv2.destroyAllWindows()
 
@@ -234,8 +234,7 @@ def realtime():
             frame = undistort_img(dis_frame, mtx, dist)
 
             diamondCorners, rvec, tvec = diamond_detection(dis_frame, mtx, dist)
-            if diamondCorners == None:
-                continue
+
             outputs = predictor(frame)
             kp_tensor = outputs["instances"].pred_keypoints
             if kp_tensor.size(dim=0) == 0 or torch.isnan(kp_tensor).any():
@@ -245,30 +244,30 @@ def realtime():
             x = kp[0, :-1, 0]
             y = kp[0, :-1, 1]
 
-            if not isMonotonic(x) and not isMonotonic(y):
-                continue
-            # #
-            # for i in range(10):
-            #     cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
-            #     cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
+            if isMonotonic(x) and isMonotonic(y) and diamondCorners:
+                int(rvec)
+                for i in range(11):
+                    cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
+                    cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
 
-            coord_3D = []
-            plist = [1, 2, 5]
+                coord_3D = []
+                # plist = [1, 2, 4, 5]
+                plist = [2, 4, 6]
 
-            for i in plist:
-                pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
-                coord_3D.append(pt)
 
-            est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 30, 50, mtx)
-            trans_tvec = pose_trans_needle(tvec, rvec) #translation from marker to needle tip
+                for i in plist:
+                    pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
+                    coord_3D.append(pt)
 
-            # print('gt', tvec)
-            print('gt', trans_tvec)
-            print('est', est_tvec)
-            print("------------------")
+                est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 40, 40, mtx)
+                # est_tvec = scale_estimation_4p(coord_3D[0], coord_3D[1], coord_3D[2], coord_3D[3], 30, 20, 30, mtx)
+                trans_tvec = pose_trans_needle(tvec, rvec) #translation from marker to needle tip
+                error = np.linalg.norm(trans_tvec - est_tvec)
+                # print('gt', transSvec)
+                print('error', error)
+
             frameS = cv2.resize(frame, (900, 675))
             cv2.imshow('Window', frameS)
-
 
             if cv2.waitKey(1) == ord('q'):
                 break
@@ -276,8 +275,46 @@ def realtime():
     cv2.destroyAllWindows()
     print('Program ends')
 
+def realtime_draw_pts():
+
+    mtx, dist = camera_para_retrieve()
+    Tis = TIS.TIS()
+    Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
+    Tis.Start_pipeline()
+    while True:
+        if Tis.Snap_image(1) is True:
+            frame = Tis.Get_image()
+            frame = frame[:, :, :3]
+            dis_frame = np.array(frame)
+            frame = undistort_img(dis_frame, mtx, dist)
+
+
+            outputs = predictor(frame)
+            kp_tensor = outputs["instances"].pred_keypoints
+            if kp_tensor.size(dim=0) == 0 or torch.isnan(kp_tensor).any():
+                continue
+
+            kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+            x = kp[0, :-1, 0]
+            y = kp[0, :-1, 1]
+            #
+            if isMonotonic(x) and isMonotonic(y):
+                for i in range(11):
+                    cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
+                    cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
+
+            frameS = cv2.resize(frame, (900, 675))
+
+            cv2.imshow('Window', frameS)
+
+            if cv2.waitKey(1) == ord('q'):
+                break
+    Tis.Stop_pipeline()
+    cv2.destroyAllWindows()
+    print('Program ends')
 if __name__ == "__main__":
     realtime()
+    # realtime_draw_pts()
     # video()
     # frame()
-    # test_algor+ithm()
+    # test_algorithm()
