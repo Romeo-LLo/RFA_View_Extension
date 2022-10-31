@@ -313,50 +313,27 @@ def realtime_draw_pts():
     print('Program ends')
 
 
-# def update_lines(lines, start_pos_t, end_pos_t, start_pos, end_pos):
-#     num_steps = 15
-#     trajs = []
-#     trajs[0] = np.linspace(start_pos_t, end_pos_t, num=num_steps)
-#     trajs[1] = np.linspace(start_pos, end_pos, num=num_steps)
-#
-#     for line, traj in zip(lines, trajs):
-#         line.set_data(traj[:, :2].T)
-#         line.set_3d_properties(traj[:, 2])
-#     return lines
-
-
 def realtime_visual():
     plt.ion()
     fig = plt.figure()
-    ax = fig.add_subplot(projection="3d")
+    ax = fig.add_subplot(111, projection='3d')
     lines = [ax.plot([], [], [])[0] for _ in range(2)]
-    l = 100
+    sq_len = 10
+    deep = 80
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
-    ax.set_xlim(-l, l)
-    ax.set_ylim(-l, l)
-    ax.set_zlim(-l, l)
-    # def update_lines(start_pos_t, end_pos_t, start_pos, end_pos):
-    #     num_steps = 15
-    #     trajs = np.zeros((2, 15, 3))
-    #     trajs[0] = np.linspace(start_pos_t, end_pos_t, num=num_steps)
-    #     trajs[1] = np.linspace(start_pos, end_pos, num=num_steps)
-    #
-    #     for line, traj in zip(lines, trajs):
-    #         line.set_data(traj[:, :2].T)
-    #         line.set_3d_properties(traj[:, 2])
-    #
-    #     fig.canvas.draw()
-    #     fig.canvas.flush_events()
-    #     time.sleep(0.1)
+    ax.set_xlim(-sq_len, sq_len)
+    ax.set_ylim(40, deep)
+    ax.set_zlim(-sq_len, sq_len)
+    num_steps = 10
 
-        # return lines
-
+    # plt.gca().invert_yaxis()
     mtx, dist = camera_para_retrieve()
     Tis = TIS.TIS()
     Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
     Tis.Start_pipeline()
+
     while True:
         if Tis.Snap_image(1) is True:
             frame = Tis.Get_image()
@@ -375,39 +352,49 @@ def realtime_visual():
             kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
             x = kp[0, :-1, 0]
             y = kp[0, :-1, 1]
-            #
-            if isMonotonic(x) and isMonotonic(y) and diamondCorners:
-                for i in range(11):
-                    cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
-                    cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
-                                (0, 0, 255), 1, cv2.LINE_AA)
 
-
-
-                coord_3D = []
-                plist = [2, 4, 6]
-
-                for i in plist:
-                    pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
-                    coord_3D.append(pt)
-
-                p1, p4 = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 40, 40, mtx)
+            if diamondCorners:
                 p1t = pose_trans_needle(tvec, rvec, 18)
                 p4t = pose_trans_needle(tvec, rvec, 3)
+                if isMonotonic(x) and isMonotonic(y):
+                    for i in range(11):
+                        cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
+                        cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
+                                    (0, 0, 255), 1, cv2.LINE_AA)
+                    coord_3D = []
+                    plist = [2, 4, 6]
 
-                num_steps = 15
-                trajs = np.zeros((2, 15, 3))
-                trajs[0] = np.linspace(p1t, p4t, num=num_steps)
-                trajs[1] = np.linspace(p1, p4, num=num_steps)
+                    for i in plist:
+                        pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
+                        coord_3D.append(pt)
+
+                    p1, p4 = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 40, 40, mtx)
+
+                    trajs = np.zeros((2, num_steps, 3))
+                    trajs[0] = np.linspace(p1t, p4t, num=num_steps)
+                    trajs[1] = np.linspace(p1, p4, num=num_steps)
+                    for line, traj in zip(lines, trajs):
+                        line.set_data(traj[:, 0], traj[:, 2])
+                        line.set_3d_properties(-traj[:, 1])
+                    fig.canvas.draw()
+                    fig.canvas.flush_events()
+
+                else:
+                    trajs = np.zeros((2, num_steps, 3))
+                    trajs[0] = np.linspace(p1t, p4t, num=num_steps)
+                    for line, traj in zip(lines, trajs):
+                        line.set_data(traj[:, 0], traj[:, 2])
+                        line.set_3d_properties(-traj[:, 1])
+                    fig.canvas.draw()
+                    fig.canvas.flush_events()
+
+            else:
+                trajs = np.zeros((2, num_steps, 3))
                 for line, traj in zip(lines, trajs):
-                    line.set_data(traj[:, :2].T)
-                    line.set_3d_properties(traj[:, 2])
+                    line.set_data(traj[:, 0], traj[:, 2])
+                    line.set_3d_properties(-traj[:, 1])
                 fig.canvas.draw()
                 fig.canvas.flush_events()
-
-                # ai = animation.FuncAnimation(
-                #     fig, update_lines, frames=100, fargs=(p1t, p4t, p1, p4), interval=100)
-                # plt.show()
 
             frameS = cv2.resize(frame, (900, 675))
 
@@ -417,7 +404,6 @@ def realtime_visual():
                 break
     Tis.Stop_pipeline()
     cv2.destroyAllWindows()
-    print('Program ends')
 
 if __name__ == "__main__":
     realtime_visual()
