@@ -353,48 +353,35 @@ def realtime_visual():
             x = kp[0, :-1, 0]
             y = kp[0, :-1, 1]
 
+            trajs = np.zeros((2, num_steps, 3))
+
             if diamondCorners:
                 p1t = pose_trans_needle(tvec, rvec, 18)
                 p4t = pose_trans_needle(tvec, rvec, 3)
-                if isMonotonic(x) and isMonotonic(y):
-                    for i in range(11):
-                        cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
-                        cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
-                                    (0, 0, 255), 1, cv2.LINE_AA)
-                    coord_3D = []
-                    plist = [2, 4, 6]
+                trajs[0] = np.linspace(p1t, p4t, num=num_steps)
 
-                    for i in plist:
-                        pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
-                        coord_3D.append(pt)
+            if isMonotonic(x) and isMonotonic(y):
+                for i in range(11):
+                    cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
+                    cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
+                                (0, 0, 255), 1, cv2.LINE_AA)
+                coord_3D = []
+                plist = [2, 4, 6]
 
-                    p1, p4 = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 40, 40, mtx)
+                for i in plist:
+                    pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
+                    coord_3D.append(pt)
 
-                    trajs = np.zeros((2, num_steps, 3))
-                    trajs[0] = np.linspace(p1t, p4t, num=num_steps)
-                    trajs[1] = np.linspace(p1, p4, num=num_steps)
-                    for line, traj in zip(lines, trajs):
-                        line.set_data(traj[:, 0], traj[:, 2])
-                        line.set_3d_properties(-traj[:, 1])
-                    fig.canvas.draw()
-                    fig.canvas.flush_events()
+                p1, p4 = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 40, 40, mtx)
+                trajs[1] = np.linspace(p1, p4, num=num_steps)
 
-                else:
-                    trajs = np.zeros((2, num_steps, 3))
-                    trajs[0] = np.linspace(p1t, p4t, num=num_steps)
-                    for line, traj in zip(lines, trajs):
-                        line.set_data(traj[:, 0], traj[:, 2])
-                        line.set_3d_properties(-traj[:, 1])
-                    fig.canvas.draw()
-                    fig.canvas.flush_events()
+            for line, traj in zip(lines, trajs):
+                line.set_data(traj[:, 0], traj[:, 2])
+                line.set_3d_properties(-traj[:, 1])
+            fig.canvas.draw()
+            fig.canvas.flush_events()
 
-            else:
-                trajs = np.zeros((2, num_steps, 3))
-                for line, traj in zip(lines, trajs):
-                    line.set_data(traj[:, 0], traj[:, 2])
-                    line.set_3d_properties(-traj[:, 1])
-                fig.canvas.draw()
-                fig.canvas.flush_events()
+
 
             frameS = cv2.resize(frame, (900, 675))
 
