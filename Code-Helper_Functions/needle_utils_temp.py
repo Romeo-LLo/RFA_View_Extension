@@ -21,7 +21,6 @@ line_height_target = 80
 def camera_para_retrieve():
     mtx = np.load('../CameraParameter/AUX273_mtx2.npy')
     dist = np.load('../CameraParameter/AUX273_dist2.npy')
-
     return mtx, dist
 
 
@@ -401,9 +400,11 @@ def diamond_detection(img, mtx, dist):
     else:
         return None, None, None
 
-def pose_trans_needle(tvec, rvec):
+def pose_trans_needle(tvec, rvec, offset=21.2):
     r_matrix, _ = cv2.Rodrigues(rvec[0][0])
-    trans = np.matmul(r_matrix, np.array([[0], [18], [2.5]]))
+    # trans = np.matmul(r_matrix, np.array([[0], [18], [2.5]]))
+    trans = np.matmul(np.array([0, offset, 2.5]), -r_matrix.T)
+
     needle_tvec = tvec[0][0] + trans.T
     return needle_tvec
 
@@ -419,19 +420,18 @@ def corner_refinement(src_gray, corners):
 
 
 def line_fit(kp):
-    x = kp[0, :, 0]
-    y = kp[0, :, 1]
+    x = kp[:, 0]
+    y = kp[:, 1]
     m, b = np.polyfit(x, y, 1)
     # p = np.poly1d(coeff)
     # p1, p2 = p(1), p(100) #dummy value
 
-    fit_kp = np.zeros((1, 10, 2))
+    fit_kp = np.zeros((3, 3))
 
     for i in range(x.shape[0]):
         x_fit = (m * y[i] + x[i] - m * b) / (m * m + 1)
         y_fit = (m * m * y[i] + m * x[i] + b) / (m * m + 1)
-        fit_kp[0][i][0] = x_fit
-        fit_kp[0][i][1] = y_fit
+        fit_kp[i] = np.array([x_fit, y_fit, 0], dtype='float64')
 
     return fit_kp
 
@@ -441,4 +441,14 @@ def isMonotonic(A):
             all(A[i] >= A[i + 1] for i in range(len(A) - 1)))
 
 
+def error_calc(tip_t, end_t, tip, end):
 
+    uv_t = (tip_t - end_t) / np.linalg.norm(tip_t - end_t)
+    uv = (tip - end) / np.linalg.norm(tip - end)
+
+    angle_error = math.degrees(np.arccos(np.clip(np.dot(uv_t, uv), -1.0, 1.0)))
+    dist_error = np.linalg.norm(tip_t - tip)
+
+    print(angle_error, dist_error)
+
+    return angle_error, dist_error

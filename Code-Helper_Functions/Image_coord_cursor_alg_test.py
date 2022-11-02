@@ -3,13 +3,16 @@ import cv2
 import numpy as np
 import sys
 
-from needle_utils_temp import camera_para_retrieve, diamond_detection, pose_trans_needle
+from needle_utils_temp import *
 from Linear_equation_temp import scale_estimation, scale_estimation_4p
 # function to display the coordinates of
 # of the points clicked on the image
 
 num_pt = 3
-coordinates = np.zeros((num_pt, 3), dtype='float64')
+# coordinates = np.zeros((num_pt, 3), dtype='float64')
+coordinates = np.array([[628, 838, 0],
+                        [535, 701, 0],
+                        [443, 569, 0]], dtype='float64')
 index = 0
 
 def click_event(event, x, y, flags, params):
@@ -20,15 +23,11 @@ def click_event(event, x, y, flags, params):
             print('Evaluate!')
             coordinates_ready = coordinates.copy()
             print(coordinates_ready)
-            print(trans_tvec[0])
+            tip_t = pose_trans_needle(tvec, rvec, 21.2)
+            end_t = pose_trans_needle(tvec, rvec, 3)
+            tip, end = scale_estimation(coordinates_ready[0], coordinates_ready[1], coordinates_ready[2], 40, 40, mtx)
 
-            est_tvec = scale_estimation(coordinates_ready[0], coordinates_ready[1], coordinates_ready[2], 30, 50, mtx)
-            print(est_tvec)
-            #
-            # est_tvec = scale_estimation_4p(coordinates_ready[0], coordinates_ready[1], coordinates_ready[2], coordinates_ready[3], 30, 20, 30, mtx)
-            # print(est_tvec)
-            trans_error = np.linalg.norm(trans_tvec - est_tvec)
-            print(trans_error)
+            error_calc(tip_t, end_t, tip, end)
 
         if y > button2[0] and y < button2[1] and x > button2[2] and x < button2[3]:
             print("current index", index)
@@ -39,9 +38,37 @@ def click_event(event, x, y, flags, params):
             print("new index", index)
         if y > button3[0] and y < button3[1] and x > button3[2] and x < button3[3]:
             coordinates = np.zeros((num_pt, 3), dtype='float64')
-            # combine_img = window_init()
             index = 0
             print('Reset')
+
+        if y > button4[0] and y < button4[1] and x > button4[2] and x < button4[3]:
+
+            tip_t = pose_trans_needle(tvec, rvec, 21.2)
+            end_t = pose_trans_needle(tvec, rvec, 3)
+
+            coordinates_ready = coordinates.copy()
+            coordinates_copy = coordinates.copy()
+
+            print(coordinates_ready)
+            tip, end = scale_estimation(coordinates_ready[0], coordinates_ready[1], coordinates_ready[2], 40, 40, mtx)
+
+
+            coordinates_fit = line_fit(coordinates_copy)
+            print(coordinates_fit)
+
+            tip_f, end_f = scale_estimation(coordinates_fit[0], coordinates_fit[1], coordinates_fit[2], 40, 40, mtx)
+            for i in range(num_pt):
+                x = int(coordinates_fit[i][0])
+                y = int(coordinates_fit[i][1])
+                cv2.putText(combine_img, str(index), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1, cv2.LINE_AA)
+                cv2.circle(combine_img, (x, y), 2, (255, 0, 0), -1)
+
+            print('Compare')
+            print('Without fit')
+            error_calc(tip_t, end_t, tip, end)
+            print('With fit')
+            error_calc(tip_f, end_f, tip, end)
+
 
 
     # checking for right mouse clicks
@@ -81,18 +108,20 @@ def window_init():
 if __name__ == "__main__":
 
     # y 768 x 1024
-    img = cv2.imread('../All_images/algorithm_test/3.jpg')
+    img = cv2.imread('../All_images/frame0.jpg')
 
     mtx, dist = camera_para_retrieve()
     diamondCorners, rvec, tvec = diamond_detection(img, mtx, dist)
     if diamondCorners == None:
         print('Try another image')
+
     trans_tvec = pose_trans_needle(tvec, rvec)  # translation from marker to needle tip
 
     bt_size = 150
     button1 = [0, bt_size, img.shape[1], img.shape[1] + bt_size]  # y, x
     button2 = [bt_size, 2 * bt_size, img.shape[1], img.shape[1] + bt_size]  # y, x
     button3 = [2 * bt_size, 3 * bt_size, img.shape[1], img.shape[1] + bt_size]  # y, x
+    button4 = [3 * bt_size, 4 * bt_size, img.shape[1], img.shape[1] + bt_size]  # y, x
 
     control_image = np.zeros((img.shape[0], bt_size, 3), np.uint8)
     control_image[:bt_size, :bt_size, :] = 180
@@ -103,6 +132,9 @@ if __name__ == "__main__":
 
     control_image[2 * bt_size:3 * bt_size, :bt_size, :] = 150
     cv2.putText(control_image, 'Clear points', (0, 50 + 2 * bt_size), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 0), 1)
+
+    control_image[3 * bt_size:4 * bt_size, :bt_size, :] = 100
+    cv2.putText(control_image, 'Compare fit', (0, 50 + 3 * bt_size), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 0), 1)
 
     combine_img = np.concatenate((img, control_image), axis=1)
     cv2.imshow('image', combine_img)

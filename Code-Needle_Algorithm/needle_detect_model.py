@@ -23,7 +23,7 @@ cfg = get_cfg()
 
 cfg.MODEL.DEVICE = "cuda"
 cfg.merge_from_file(model_zoo.get_config_file("COCO-Keypoints/keypoint_rcnn_R_50_FPN_3x.yaml"))
-cfg.MODEL.WEIGHTS = 'model_final3.pth'
+cfg.MODEL.WEIGHTS = '../Model_path/model_final3.pth'
 cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7   # set a custom testing threshold
 cfg.TEST.DETECTIONS_PER_IMAGE = 1
 cfg.MODEL.ROI_KEYPOINT_HEAD.NUM_KEYPOINTS = 12
@@ -40,46 +40,160 @@ gi.require_version("Gst", "1.0")
 from gi.repository import Gst
 
 def video():
+
+    num_steps = 5
     mtx, dist = camera_para_retrieve()
-    cap = cv2.VideoCapture('../All_images/needle_test0915.mp4')
-    while cap.isOpened():
-        start = time.time()
-        ret, frame = cap.read()
-        frame = undistort_img(frame, mtx, dist)
-        if not ret:
-            print('Fail')
-            break
+    frame_num = 0
+    avg_angle_error = 0
+    avg_dist_error = 0
+    avg_angle_error_fit = 0
+    avg_dist_error_fit = 0
+    for id in range(1, 6):
+        cap = cv2.VideoCapture(f'../All_images/video{id}.mp4')
+        while cap.isOpened():
+            ret, dis_frame = cap.read()
+            if ret:
+                frame = undistort_img(dis_frame, mtx, dist)
+                diamondCorners, rvec, tvec = diamond_detection(dis_frame, mtx, dist)
 
-        outputs = predictor(frame)
-        diamondCorners, rvec, tvec = diamond_detection(frame, mtx, dist)
+                outputs = predictor(frame)
+                kp_tensor = outputs["instances"].pred_keypoints
+                if kp_tensor.size(dim=0) == 0 or torch.isnan(kp_tensor).any():
+                    continue
 
-        kp = outputs["instances"].pred_keypoints.to("cpu").numpy()
-        if kp.shape[0] != 0:
-            # for i in range(10):
-            #     cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
-            #     cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 2,
-            #                 (0, 0, 255), 1, cv2.LINE_AA)
+                kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+                x = kp[0, :-1, 0]
+                y = kp[0, :-1, 1]
+                trajs = np.zeros((2, num_steps, 3))
 
-            coord_3D = []
-            for i in range(3):
-                pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
-                coord_3D.append(pt)
+                if isMonotonic(x) and isMonotonic(y):
+                    coord_3D = []
+                    plist = [2, 4, 6]
 
-            est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 32, 30, mtx)
+                    coord_3D_fit = []
+                    kp_fit = orth_fit(x, y)
+                    # coord_3D_fit = partial_orth_fit(x, y, plist)
 
-            if diamondCorners != None:
-                print(int(tvec[0][0][2]), int(est_tvec[2]))
+                    for i in plist:
+                        pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
+                        coord_3D.append(pt)
 
-            pressedKey = cv2.waitKey(1) & 0xFF
-            if pressedKey == ord('q'):
+                        pt_f = np.array([kp_fit[0][i][0], kp_fit[0][i][1], 0], dtype='float64')
+                        coord_3D_fit.append(pt_f)
+                    #
+                    # print(coord_3D)
+                    # print(coord_3D_fit)
+
+                    tip, end = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 40, 40, mtx)
+                    tip_f, end_f = scale_estimation(coord_3D_fit[0], coord_3D_fit[1], coord_3D_fit[2], 40, 40, mtx)
+
+                    trajs[1] = np.linspace(tip, end, num=num_steps)
+
+                    if diamondCorners:
+                        tip_t = pose_trans_needle(tvec, rvec, 21.2)
+                        end_t = pose_trans_needle(tvec, rvec, 3)
+                        trajs[0] = np.linspace(tip_t, end_t, num=num_steps)
+
+                        frame_num += 1
+                        angle_error, dist_error = error_calc(tip_t, end_t, tip, end)
+                        avg_angle_error += angle_error
+                        avg_dist_error += dist_error
+                        # print('normal', angle_error, dist_error)
+
+                        angle_error_fit, dist_error_fit = error_calc(tip_t, end_t, tip_f, end_f)
+                        avg_angle_error_fit += angle_error_fit
+                        avg_dist_error_fit += dist_error_fit
+                        # print('fit', angle_error_fit, dist_error_fit)
+
+                if cv2.waitKey(1) == ord('q'):
+                    break
+            else:
                 break
-            # frameS = cv2.resize(frame, (720, 540))
-            # cv2.imshow('Window', frameS)
-        end = time.time()
-        print(1 / (end - start))
-    cap.release()
-    cv2.destroyAllWindows()
-    print('Program ends')
+        cap.release()
+        print(f'{frame_num} for video{id}')
+
+    print(f'Avg angle err = {avg_angle_error / frame_num}')
+    print(f'Avg dist err = {avg_dist_error / frame_num}')
+
+    print(f'Avg angle err fit= {avg_angle_error_fit / frame_num}')
+    print(f'Avg dist err fit = {avg_dist_error_fit / frame_num}')
+
+def video_visual():
+    plt.ion()
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    lines = [ax.plot([], [], [])[0] for _ in range(2)]
+    sq_len = 10
+    deep = 80
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_xlim(-sq_len, sq_len)
+    ax.set_ylim(40, deep)
+    ax.set_zlim(-sq_len, sq_len)
+
+    num_steps = 5
+    mtx, dist = camera_para_retrieve()
+
+    for id in range(1, 6):
+        cap = cv2.VideoCapture(f'../All_images/video{id}.mp4')
+        while cap.isOpened():
+            ret, dis_frame = cap.read()
+            if ret:
+                frame = undistort_img(dis_frame, mtx, dist)
+
+                diamondCorners, rvec, tvec = diamond_detection(dis_frame, mtx, dist)
+
+                outputs = predictor(frame)
+                kp_tensor = outputs["instances"].pred_keypoints
+                if kp_tensor.size(dim=0) == 0 or torch.isnan(kp_tensor).any():
+                    continue
+
+                kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+                x = kp[0, :-1, 0]
+                y = kp[0, :-1, 1]
+                trajs = np.zeros((2, num_steps, 3))
+
+                if isMonotonic(x) and isMonotonic(y):
+                    for i in range(11):
+                        cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
+                        cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
+                                    (0, 0, 255), 1, cv2.LINE_AA)
+
+                    coord_3D = []
+                    plist = [2, 4, 6]
+
+                    for i in plist:
+                        pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
+                        coord_3D.append(pt)
+
+                    tip, end = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 40, 40, mtx)
+                    trajs[1] = np.linspace(tip, end, num=num_steps)
+
+                    if diamondCorners:
+                        tip_t = pose_trans_needle(tvec, rvec, 21.2)
+                        end_t = pose_trans_needle(tvec, rvec, 3)
+                        trajs[0] = np.linspace(tip_t, end_t, num=num_steps)
+                        angle_error, dist_error = error_calc(tip_t, end_t, tip, end)
+                        print('normal', angle_error, dist_error)
+
+                for line, traj in zip(lines, trajs):
+                    line.set_data(traj[:, 0], traj[:, 2])
+                    line.set_3d_properties(-traj[:, 1])
+
+                fig.canvas.draw()
+                fig.canvas.flush_events()
+                frameS = cv2.resize(frame, (900, 675))
+                cv2.imshow('Window', frameS)
+
+                if cv2.waitKey(1) == ord('q'):
+                    break
+            else:
+                break
+
+        cap.release()
+        cv2.destroyAllWindows()
+
 
 
 def frame():
@@ -251,19 +365,21 @@ def realtime():
                     cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
 
                 coord_3D = []
-                # plist = [1, 2, 4, 5]
-                plist = [2, 4, 6]
+                plist = [2, 4, 6, 8]
 
                 for i in plist:
                     pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
                     coord_3D.append(pt)
 
                 est_tvec = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 40, 40, mtx)
-                # est_tvec = scale_estimation_4p(coord_3D[0], coord_3D[1], coord_3D[2], coord_3D[3], 30, 20, 30, mtx)
+                est_tvec_4 = scale_estimation_4p(coord_3D[0], coord_3D[1], coord_3D[2], coord_3D[3], 40, 40, 20, mtx)
                 trans_tvec = pose_trans_needle(tvec, rvec)  # translation from marker to needle tip
-                error = np.linalg.norm(trans_tvec - est_tvec)
+                print(est_tvec)
+                print(est_tvec_4)
+                print("___________")
+                # error = np.linalg.norm(trans_tvec - est_tvec)
                 # print('gt', transSvec)
-                print('error', error)
+                # print('error', error)
 
             frameS = cv2.resize(frame, (900, 675))
             cv2.imshow('Window', frameS)
@@ -328,7 +444,6 @@ def realtime_visual():
     ax.set_zlim(-sq_len, sq_len)
     num_steps = 10
 
-    # plt.gca().invert_yaxis()
     mtx, dist = camera_para_retrieve()
     Tis = TIS.TIS()
     Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
@@ -356,9 +471,9 @@ def realtime_visual():
             trajs = np.zeros((2, num_steps, 3))
 
             if diamondCorners:
-                p1t = pose_trans_needle(tvec, rvec, 18)
-                p4t = pose_trans_needle(tvec, rvec, 3)
-                trajs[0] = np.linspace(p1t, p4t, num=num_steps)
+                tip_t = pose_trans_needle(tvec, rvec, 21.2)
+                end_t = pose_trans_needle(tvec, rvec, 3)
+                trajs[0] = np.linspace(tip_t, end_t, num=num_steps)
 
             if isMonotonic(x) and isMonotonic(y):
                 for i in range(11):
@@ -372,8 +487,11 @@ def realtime_visual():
                     pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
                     coord_3D.append(pt)
 
-                p1, p4 = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 40, 40, mtx)
-                trajs[1] = np.linspace(p1, p4, num=num_steps)
+                tip, end = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 40, 40, mtx)
+                trajs[1] = np.linspace(tip, end, num=num_steps)
+
+                if diamondCorners:
+                    angle_error, dist_error = error_calc(tip_t, end_t, tip, end)
 
             for line, traj in zip(lines, trajs):
                 line.set_data(traj[:, 0], traj[:, 2])
@@ -393,9 +511,11 @@ def realtime_visual():
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    realtime_visual()
+    # realtime_visual()
     # realtime()
     # realtime_draw_pts()
-    # video()
+    video()
+    # video_visual()
+
     # frame()
     # test_algorithm()

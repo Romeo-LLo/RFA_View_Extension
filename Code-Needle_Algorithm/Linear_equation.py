@@ -1,6 +1,8 @@
 import numpy as np
 import math
 from scipy.linalg import null_space
+from sympy import Matrix
+
 # import cv2.aruco as aruco
 import cv2
 from needle_utils import camera_para_retrieve
@@ -64,14 +66,12 @@ def scale_estimation(q1, q2, q3, d1, d2, mtx):
     p3 = 0.1 * (F + v3 * s3) * np.array([-1, -1, 1])
 
     unit = (p2 - p1) / np.linalg.norm((p2 - p1), axis=0)
-    p4 = p1 + unit * 15
-
-    # g1 = np.linalg.norm((p1 - p2), axis=0)
-    # g2 = np.linalg.norm((p2 - p3), axis=0)
+    tip = p1 - unit * 3.2
+    end = p1 + unit * 15
 
 
 
-    return p1, p4
+    return tip, end
 
 
 def scale_estimation_4p(q1, q2, q3, q4, d1, d2, d3, mtx):
@@ -114,12 +114,12 @@ def scale_estimation_4p(q1, q2, q3, q4, d1, d2, d3, mtx):
     b4 = np.dot(v4, B)
 
     S = np.array([
-        [d2 * a1, -d1 * a2 - d2 * a2, d1 * a3],
-        [d2 * b1, -d1 * b2 - d2 * b2, d1 * b3],
-        [d3 * a1, -d1 * a3 - d3 * a2, d1 * a4],
-        [d3 * b1, -d1 * b3 - d3 * b2, d1 * b4],
-        [d3 * a2, -d2 * a3 - d3 * a3, d2 * a4],
-        [d3 * b2, -d2 * b3 - d3 * b3, d2 * b4]
+        [d2 * a1, -d1 * a2 - d2 * a2, d1 * a3, 0],
+        [d2 * b1, -d1 * b2 - d2 * b2, d1 * b3, 0],
+        [d3 * a1, -d3 * a2, -d1 * a3, d1 * a4],
+        [d3 * b1, -d3 * b2, -d1 * b3, d1 * b4],
+        [0, d3 * a2, -d2 * a3 - d3 * a3, d2 * a4],
+        [0, d3 * b2, -d2 * b3 - d3 * b3, d2 * b4]
     ])
     ns = null_space(S)
 

@@ -9,6 +9,7 @@ from scipy.signal import argrelextrema, find_peaks
 import bisect
 import cv2.aruco as aruco
 # from bresenham import bresenham
+from scipy import odr
 
 pixel_lower_thres = 20
 pixel_upper_thres = 50
@@ -400,7 +401,7 @@ def diamond_detection(img, mtx, dist):
     else:
         return None, None, None
 
-def pose_trans_needle(tvec, rvec, offset=18):
+def pose_trans_needle(tvec, rvec, offset=21.2):
     r_matrix, _ = cv2.Rodrigues(rvec[0][0])
     # trans = np.matmul(r_matrix, np.array([[0], [18], [2.5]]))
     trans = np.matmul(np.array([0, offset, 2.5]), -r_matrix.T)
@@ -418,15 +419,15 @@ def corner_refinement(src_gray, corners):
 
     return rf_corners
 
+# find the closet point on the fit line
+def line_fit(x, y):
 
-def line_fit(kp):
-    x = kp[0, :, 0]
-    y = kp[0, :, 1]
-    m, b = np.polyfit(x, y, 1)
+    (m, b), res = np.polyfit(x, y, 1, full=True)[:2]
+    print('res', res)
     # p = np.poly1d(coeff)
     # p1, p2 = p(1), p(100) #dummy value
 
-    fit_kp = np.zeros((1, 10, 2))
+    fit_kp = np.zeros((1, x.shape[0], 2))
 
     for i in range(x.shape[0]):
         x_fit = (m * y[i] + x[i] - m * b) / (m * m + 1)
@@ -436,6 +437,78 @@ def line_fit(kp):
 
     return fit_kp
 
+def partial_line_fit(all_x, all_y, plist):
+    # here we directly transfer to 3D points
+    x = all_x[plist]
+    y = all_y[plist]
+
+
+    (m, b), res = np.polyfit(x, y, 1, full=True)[:2]
+
+
+    coord_3D_fit = np.zeros((x.shape[0], 3))
+
+    for i in range(x.shape[0]):
+        x_fit = (m * y[i] + x[i] - m * b) / (m * m + 1)
+        y_fit = (m * m * y[i] + m * x[i] + b) / (m * m + 1)
+        coord_3D_fit[i] = np.array([x_fit, y_fit, 0], dtype='float64')
+
+
+    return coord_3D_fit
+
+
+def target_function(p, x):
+    m, b = p
+    return m * x + b
+
+def orth_fit(x, y):
+    # res is based on orthogonal distance instead of vertical distance
+
+    m_, b_ = np.polyfit(x, y, 1)
+
+
+    odr_model = odr.Model(target_function)
+
+    data = odr.Data(x, y)
+    ordinal_distance_reg = odr.ODR(data, odr_model,
+                                   beta0=[m_, b_])
+    out = ordinal_distance_reg.run()
+    # print(out.sum_square)
+    m, b = out.beta
+
+    fit_kp = np.zeros((1, x.shape[0], 2))
+
+    for i in range(x.shape[0]):
+        x_fit = (m * y[i] + x[i] - m * b) / (m * m + 1)
+        y_fit = (m * m * y[i] + m * x[i] + b) / (m * m + 1)
+        fit_kp[0][i][0] = x_fit
+        fit_kp[0][i][1] = y_fit
+    return fit_kp
+def partial_orth_fit(all_x, all_y, plist):
+    # res is based on orthogonal distance instead of vertical distance
+    x = all_x[plist]
+    y = all_y[plist]
+    m_, b_ = np.polyfit(x, y, 1)
+
+
+    odr_model = odr.Model(target_function)
+
+    data = odr.Data(x, y)
+    ordinal_distance_reg = odr.ODR(data, odr_model,
+                                   beta0=[m_, b_])
+    out = ordinal_distance_reg.run()
+    print(out.sum_square)
+    m, b = out.beta
+    coord_3D_fit = np.zeros((x.shape[0], 3))
+
+    for i in range(x.shape[0]):
+        x_fit = (m * y[i] + x[i] - m * b) / (m * m + 1)
+        y_fit = (m * m * y[i] + m * x[i] + b) / (m * m + 1)
+        coord_3D_fit[i] = np.array([x_fit, y_fit, 0], dtype='float64')
+
+    return coord_3D_fit
+
+
 
 def isMonotonic(A):
     return (all(A[i] <= A[i + 1] for i in range(len(A) - 1)) or
@@ -443,3 +516,14 @@ def isMonotonic(A):
 
 
 
+def error_calc(tip_t, end_t, tip, end):
+
+    uv_t = (tip_t - end_t) / np.linalg.norm(tip_t - end_t)
+    uv = (tip - end) / np.linalg.norm(tip - end)
+
+    angle_error = math.degrees(np.arccos(np.clip(np.dot(uv_t, uv), -1.0, 1.0)))
+    dist_error = np.linalg.norm(tip_t - tip)
+
+    # print(angle_error, dist_error)
+
+    return angle_error, dist_error
