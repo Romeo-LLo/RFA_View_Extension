@@ -5,7 +5,7 @@ from sympy import Matrix
 
 # import cv2.aruco as aruco
 import cv2
-from needle_utils_temp import camera_para_retrieve
+from needle_utils_temp import *
 def scale_estimation(q1, q2, q3, d1, d2, mtx):
 
     x_scale = (3.45 / 1000)  # pixel size : 3.45 Micrometer = 0.00345 mm
@@ -72,6 +72,74 @@ def scale_estimation(q1, q2, q3, d1, d2, mtx):
 
 
     return tip, end
+
+def scale_estimation_multi(q1, q2, q3, d1, d2, mtx, tip_offset):
+
+    f = 8
+    scale = mtx[0][0]
+    x_scale = f / scale
+    y_scale = f / scale
+
+    scale = np.array([x_scale, y_scale, 0])
+    trans = np.array([mtx[0][2], mtx[1][2], 0])
+
+    q1 -= trans
+    q2 -= trans
+    q3 -= trans
+
+    q1 *= scale
+    q2 *= scale
+    q3 *= scale
+
+
+    F = np.array([0, 0, f])
+
+    v1 = (F - q1) / np.linalg.norm((F - q1), axis=0)
+    v2 = (F - q2) / np.linalg.norm((F - q2), axis=0)
+    v3 = (F - q3) / np.linalg.norm((F - q3), axis=0)
+
+    A = v1
+    n = np.cross(v1, v2) / np.linalg.norm(np.cross(v1, v2), axis=0)
+    B = np.cross(n, A)
+
+    a1 = np.dot(v1, A)
+    a2 = np.dot(v2, A)
+    a3 = np.dot(v3, A)
+
+    b1 = np.dot(v1, B)
+    b2 = np.dot(v2, B)
+    b3 = np.dot(v3, B)
+
+    S = np.array([[d2*a1, -d1*a2-d2*a2, d1*a3], [d2*b1, -d1*b2-d2*b2, d1*b3]])
+    ns = null_space(S)
+
+    #check
+
+    d1p = np.linalg.norm(ns[0] * v1 - ns[1] * v2, axis=0)
+    d2p = np.linalg.norm(ns[1] * v2 - ns[2] * v3, axis=0)
+    scale_1 = d1 / d1p
+    scale_2 = d2 / d2p
+    s1 = ns[0] * scale_1
+    s2 = ns[1] * scale_1
+    s3 = ns[2] * scale_1
+
+    p1 = 0.1 * (F + v1 * s1) * np.array([-1, -1, 1])
+    p2 = 0.1 * (F + v2 * s2) * np.array([-1, -1, 1])
+    p3 = 0.1 * (F + v3 * s3) * np.array([-1, -1, 1])
+
+    unit1 = (p3 - p1) / np.linalg.norm((p3 - p1), axis=0)
+    tip1 = p1 - unit1 * tip_offset
+
+
+    unit2 = (p2 - p1) / np.linalg.norm((p2 - p1), axis=0)
+    tip2 = p1 - unit2 * tip_offset
+
+
+    board_coordinate = np.load("../Coordinate/board_coordinate.npy")
+    tip_b = board_coordinate[1]
+    error1 = error_calc_board(tip1)
+    error2 = error_calc_board(tip2)
+
 
 
 def scale_estimation_4p(q1, q2, q3, q4, d1, d2, d3, mtx):

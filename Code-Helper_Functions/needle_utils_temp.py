@@ -8,7 +8,8 @@ from matplotlib.patches import Circle
 from scipy.signal import argrelextrema, find_peaks
 import bisect
 import cv2.aruco as aruco
-# from bresenham import bresenham
+from scipy import odr
+
 
 pixel_lower_thres = 20
 pixel_upper_thres = 50
@@ -19,8 +20,8 @@ line_height = 50
 line_height_target = 80
 
 def camera_para_retrieve():
-    mtx = np.load('../CameraParameter/AUX273_mtx2.npy')
-    dist = np.load('../CameraParameter/AUX273_dist2.npy')
+    mtx = np.load('../CameraParameter/AUX273_mtx1110.npy')
+    dist = np.load('../CameraParameter/AUX273_dist1110.npy')
     return mtx, dist
 
 
@@ -400,13 +401,18 @@ def diamond_detection(img, mtx, dist):
     else:
         return None, None, None
 
-def pose_trans_needle(tvec, rvec, offset=21.2):
-    r_matrix, _ = cv2.Rodrigues(rvec[0][0])
-    # trans = np.matmul(r_matrix, np.array([[0], [18], [2.5]]))
-    trans = np.matmul(np.array([0, offset, 2.5]), -r_matrix.T)
+def pose_trans_needle(tvec, rvec):
 
-    needle_tvec = tvec[0][0] + trans.T
-    return needle_tvec
+    r_matrix, _ = cv2.Rodrigues(rvec[0][0])
+    offset = np.array([-0.2010633, - 20.75761236, - 3.84062503])
+    tip_trans = np.matmul(offset, r_matrix.T)
+    tip = tvec[0][0] + tip_trans.T
+
+    end_trans = np.matmul(np.array([0, 0, -2.5]), r_matrix.T)
+    end = tvec[0][0] + end_trans.T
+
+    return tip, end
+
 
 
 def corner_refinement(src_gray, corners):
@@ -452,3 +458,44 @@ def error_calc(tip_t, end_t, tip, end):
     print(angle_error, dist_error)
 
     return angle_error, dist_error
+
+def target_function(p, x):
+    m, b = p
+    return m * x + b
+
+
+def orth_fit(kp):
+    # res is based on orthogonal distance instead of vertical distance
+    x = kp[:, 0]
+    y = kp[:, 1]
+    m_, b_ = np.polyfit(x, y, 1)
+
+
+    odr_model = odr.Model(target_function)
+
+    data = odr.Data(x, y)
+    ordinal_distance_reg = odr.ODR(data, odr_model,
+                                   beta0=[m_, b_])
+    out = ordinal_distance_reg.run()
+    print(out.sum_square)
+    m, b = out.beta
+    coord_3D_fit = np.zeros((x.shape[0], 3))
+
+    for i in range(x.shape[0]):
+        x_fit = (m * y[i] + x[i] - m * b) / (m * m + 1)
+        y_fit = (m * m * y[i] + m * x[i] + b) / (m * m + 1)
+        coord_3D_fit[i] = np.array([x_fit, y_fit, 0], dtype='float64')
+
+    return coord_3D_fit
+
+
+
+def error_calc_board(tip):
+
+    board_coordinate = np.load("../Coordinate/board_coordinate.npy")
+    tip_b = board_coordinate[1]
+    error = np.linalg.norm(tip_b - tip)
+
+    print(f"error : {error}")
+
+    return error

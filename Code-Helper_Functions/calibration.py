@@ -173,18 +173,18 @@ def calibrate_camera(allCorners, allIds, imsize):
 
 def photosnapshot():
     cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
-    calib_img_path = '../All_Images/calib_Img2'
+    calib_img_path = '../All_Images/calibration'
     pba = PhotoBoothApp(cap, calib_img_path)
     pba.root.mainloop()
 
 
 def calibration():
-    images = glob.glob('../All_Images/calib_Img2/*.jpg')
+    images = glob.glob('../All_Images/calibration/*.jpg')
     allCorners, allIds, imsize = read_chessboards(images)
     ret, mtx, dist, rvecs, tvecs = calibrate_camera(allCorners,allIds,imsize)
-    np.save('../CameraParameter/AUX273_mtx2.npy', mtx)
-    np.save('../CameraParameter/AUX273_dist2.npy', dist)
+    np.save('../CameraParameter/AUX273_mtx1108.npy', mtx)
+    np.save('../CameraParameter/AUX273_dist1108.npy', dist)
 
 if __name__ == "__main__":
-    calibration()
-    # photosnapshot()
+    # calibration()
+    photosnapshot()

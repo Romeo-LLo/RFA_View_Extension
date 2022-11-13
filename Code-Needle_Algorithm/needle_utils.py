@@ -20,9 +20,12 @@ line_height = 50
 line_height_target = 80
 
 def camera_para_retrieve():
-    mtx = np.load('../CameraParameter/AUX273_mtx2.npy')
-    dist = np.load('../CameraParameter/AUX273_dist2.npy')
-    return mtx, dist
+
+    mtx1110 = np.load('../CameraParameter/AUX273_mtx1110.npy')
+    dist1110 = np.load('../CameraParameter/AUX273_dist1110.npy')
+    # mtx2 = np.load('../CameraParameter/AUX273_mtx2.npy')
+    # dist2 = np.load('../CameraParameter/AUX273_dist2.npy')
+    return mtx1110, dist1110
 
 
 def generate_mask(diamondCorners, img):
@@ -401,13 +404,6 @@ def diamond_detection(img, mtx, dist):
     else:
         return None, None, None
 
-def pose_trans_needle(tvec, rvec, offset=21.2):
-    r_matrix, _ = cv2.Rodrigues(rvec[0][0])
-    # trans = np.matmul(r_matrix, np.array([[0], [18], [2.5]]))
-    trans = np.matmul(np.array([0, offset, 2.5]), -r_matrix.T)
-
-    needle_tvec = tvec[0][0] + trans.T
-    return needle_tvec
 
 
 def corner_refinement(src_gray, corners):
@@ -524,6 +520,59 @@ def error_calc(tip_t, end_t, tip, end):
     angle_error = math.degrees(np.arccos(np.clip(np.dot(uv_t, uv), -1.0, 1.0)))
     dist_error = np.linalg.norm(tip_t - tip)
 
+    # print(abs(tip_t - tip))
     # print(angle_error, dist_error)
 
     return angle_error, dist_error
+
+def board_offset(rvec, tvec):
+    r_matrix, _ = cv2.Rodrigues(rvec)
+
+    board_len = 4.5
+    offsets = np.array([[0, 0, 0], [2*board_len, 0, 0], [2*board_len, 2*board_len, 0], [4*board_len, board_len, 0], [5*board_len, board_len, 0]])
+
+    coord3D = np.zeros((5, 3))
+    for i, offset in enumerate(offsets):
+        trans = np.matmul(offset, r_matrix.T)
+        coord3D[i] = tvec.T + trans
+
+    return coord3D
+
+
+def error_calc_board(tip, typ):
+
+    board_coordinate = np.load("../Coordinate/board_coordinate.npy")
+    tip_b = board_coordinate[1]
+    tip_type = ["aruco", "alg"]
+    error = np.linalg.norm(tip_b - tip)
+
+    print(f"{tip_type[typ]} : {tip} / error : {error}")
+
+    return error
+
+def pose_trans_needle(tvec, rvec):
+    # # origial = 21.2
+    # r_matrix, _ = cv2.Rodrigues(rvec[0][0])
+    # offset = np.array([1.07243335, 20.38937994, 2.73006118])
+    # # offset = np.array([0, 21.2, 2.5])
+    # tip_trans = np.matmul(offset, -r_matrix.T)
+    #
+    # tip = tvec[0][0] + tip_trans.T
+    #
+    # end_trans = np.matmul(np.array([0, 0, 2.5]), -r_matrix.T)
+    # end = tvec[0][0] + end_trans.T
+
+
+    r_matrix, _ = cv2.Rodrigues(rvec[0][0])
+    # offset = np.array([0, -20.8, -2.5])
+    # offset = np.array([-0.0484527, - 20.0817824, - 2.91639071])
+    offset = np.array([-0.2010633, - 20.75761236, - 3.84062503])
+    # tip_trans = np.matmul(r_matrix, offset)
+    tip_trans = np.matmul(offset, r_matrix.T)
+
+    tip = tvec[0][0] + tip_trans.T
+
+    end_trans = np.matmul(np.array([0, 0, -2.5]), r_matrix.T)
+    end = tvec[0][0] + end_trans.T
+
+    return tip, end

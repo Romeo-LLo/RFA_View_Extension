@@ -4,15 +4,15 @@ import numpy as np
 import sys
 
 from needle_utils_temp import *
-from Linear_equation_temp import scale_estimation, scale_estimation_4p
+from Linear_equation_temp import *
 # function to display the coordinates of
 # of the points clicked on the image
 
 num_pt = 3
 # coordinates = np.zeros((num_pt, 3), dtype='float64')
-coordinates = np.array([[628, 838, 0],
-                        [535, 701, 0],
-                        [443, 569, 0]], dtype='float64')
+coordinates = np.array([[489, 737, 0],
+                        [443, 554, 0],
+                        [395, 389, 0]], dtype='float64')
 index = 0
 
 def click_event(event, x, y, flags, params):
@@ -23,11 +23,8 @@ def click_event(event, x, y, flags, params):
             print('Evaluate!')
             coordinates_ready = coordinates.copy()
             print(coordinates_ready)
-            tip_t = pose_trans_needle(tvec, rvec, 21.2)
-            end_t = pose_trans_needle(tvec, rvec, 3)
-            tip, end = scale_estimation(coordinates_ready[0], coordinates_ready[1], coordinates_ready[2], 40, 40, mtx)
 
-            error_calc(tip_t, end_t, tip, end)
+            scale_estimation_multi(coordinates_ready[0], coordinates_ready[1], coordinates_ready[2], 50, 50, mtx, 3.2)
 
         if y > button2[0] and y < button2[1] and x > button2[2] and x < button2[3]:
             print("current index", index)
@@ -53,7 +50,7 @@ def click_event(event, x, y, flags, params):
             tip, end = scale_estimation(coordinates_ready[0], coordinates_ready[1], coordinates_ready[2], 40, 40, mtx)
 
 
-            coordinates_fit = line_fit(coordinates_copy)
+            coordinates_fit = orth_fit(coordinates_copy)
             print(coordinates_fit)
 
             tip_f, end_f = scale_estimation(coordinates_fit[0], coordinates_fit[1], coordinates_fit[2], 40, 40, mtx)
@@ -108,14 +105,13 @@ def window_init():
 if __name__ == "__main__":
 
     # y 768 x 1024
-    img = cv2.imread('../All_images/frame0.jpg')
+    img = cv2.imread('../All_images/error_investigate/41-16.jpg')
 
     mtx, dist = camera_para_retrieve()
-    diamondCorners, rvec, tvec = diamond_detection(img, mtx, dist)
-    if diamondCorners == None:
-        print('Try another image')
-
-    trans_tvec = pose_trans_needle(tvec, rvec)  # translation from marker to needle tip
+    # diamondCorners, rvec, tvec = diamond_detection(img, mtx, dist)
+    # if diamondCorners == None:
+    #     print('Try another image')
+    # tip_aruco, end_aruco = pose_trans_needle(tvec, rvec)  # translation from marker to needle tip
 
     bt_size = 150
     button1 = [0, bt_size, img.shape[1], img.shape[1] + bt_size]  # y, x
