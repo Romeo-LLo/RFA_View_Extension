@@ -275,7 +275,7 @@ def test_algorithm():
 
         if not isMonotonic(x) and not isMonotonic(y):
             continue
-        fit_kp = line_fit(kp[:, :-1, :])
+        fit_kp = line_fit(x, y)
 
         corners = np.array(fit_kp[0])
         corners = np.float32(corners.astype(int))
@@ -514,8 +514,8 @@ if __name__ == "__main__":
     # realtime_visual()
     # realtime()
     # realtime_draw_pts()
-    video()
+    # video()
     # video_visual()
 
     # frame()
-    # test_algorithm()
+    test_algorithm()

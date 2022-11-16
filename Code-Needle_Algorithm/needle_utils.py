@@ -366,12 +366,6 @@ def contrast_enhance(image):
 
     return adjusted
 
-# def undistort(img, mtx, dist):
-#
-#     h, w = img.shape[:2]
-#     newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
-#     undist = cv2.undistort(img, mtx, dist, None, newcameramtx)
-#     return undist
 
 def undistort_img(img, mtx, dist):
 
@@ -529,7 +523,7 @@ def board_offset(rvec, tvec):
     r_matrix, _ = cv2.Rodrigues(rvec)
 
     board_len = 4.5
-    offsets = np.array([[0, 0, 0], [2*board_len, 0, 0], [2*board_len, 2*board_len, 0], [4*board_len, board_len, 0], [5*board_len, board_len, 0]])
+    offsets = np.array([[0, 0, 0], [2*board_len, 0, 0], [3*board_len, 0, 0], [4*board_len, board_len, 0], [5*board_len, board_len, 0]])
 
     coord3D = np.zeros((5, 3))
     for i, offset in enumerate(offsets):
@@ -539,16 +533,23 @@ def board_offset(rvec, tvec):
     return coord3D
 
 
-def error_calc_board(tip, typ):
+def error_calc_board(tip, anchor):
 
     board_coordinate = np.load("../Coordinate/board_coordinate.npy")
-    tip_b = board_coordinate[1]
-    tip_type = ["aruco", "alg"]
+    tip_b = board_coordinate[anchor]
     error = np.linalg.norm(tip_b - tip)
 
-    print(f"{tip_type[typ]} : {tip} / error : {error}")
-
     return error
+
+
+def error_vec_calc_board(tip, anchor):
+
+    board_coordinate = np.load("../Coordinate/board_coordinate.npy")
+    tip_b = board_coordinate[anchor]
+
+    err_vec = tip_b-tip
+    err_vec = [round(x, 2) for x in err_vec]
+    return err_vec
 
 def pose_trans_needle(tvec, rvec):
     # # origial = 21.2
