@@ -25,8 +25,8 @@ def stability_test():
     anchor = 1
 
     mtx, dist = camera_para_retrieve()
-    coordinates = np.array([[506.49, 853.06, 0],
-                            [479.72, 642.93, 0],
+    coordinates = np.array([[506.24, 853.60, 0],
+                            [479.23, 642.13, 0],
                             [439.34, 410.83, 0]], dtype='float64')
     board_coordinate = np.load("../Coordinate/board_coordinate.npy")
     tip_b = board_coordinate[anchor]

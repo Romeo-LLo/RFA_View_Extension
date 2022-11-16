@@ -409,7 +409,6 @@ def aruco_test():
 def arucoboard_test():
     camera_matrix, dist_coefs = camera_para_retrieve()
     dictionary = aruco.Dictionary_get(aruco.DICT_4X4_1000)
-    # board = aruco.CharucoBoard_create(9, 5, 3, 2.3, dictionary)
     board = aruco.CharucoBoard_create(5, 4, 4.5, 3.5, dictionary)
 
     Tis = TIS.TIS()
@@ -458,6 +457,7 @@ def arucoboard_test():
 
                     if retval:
                         cv2.aruco.drawAxis(img_color, camera_matrix, dist_coefs, rvec, tvec, 5)
+                        print(tvec)
                         if state:
                             coord3D = board_offset(rvec, tvec)
                             avg_coord3D += coord3D
@@ -474,24 +474,22 @@ def arucoboard_test():
     cv2.destroyAllWindows()
 
 
-def realtime_error_board():
+def realtime_error_snapshot():
 
     mtx, dist = camera_para_retrieve()
     Tis = TIS.TIS()
     Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
     Tis.Start_pipeline()
+    est_state = False
 
     anchor = 1
     while True:
         if Tis.Snap_image(1) is True:
-            est_state = False
 
             frame = Tis.Get_image()
             frame = frame[:, :, :3]
             dis_frame = np.array(frame)
             frame = undistort_img(dis_frame, mtx, dist)
-
-            diamondCorners, rvec, tvec = diamond_detection(dis_frame, mtx, dist)
 
             outputs = predictor(frame)
             kp_tensor = outputs["instances"].pred_keypoints
@@ -521,55 +519,218 @@ def realtime_error_board():
 
                     error = error_calc_board(tip, anchor=anchor)
                     error_vec = error_vec_calc_board(tip, anchor=anchor)
-                    est_state = True
-                    print(error)
+                    print(f'{error:.2f}')
 
-        frameS = cv2.resize(frame, (1080, 810))
-        cv2.imshow('Window', frameS)
+                    if est_state:
 
-        if est_state:
-            if error < 0.2:
-                outputPath = '../All_images/error_investigate'
-                ts = datetime.datetime.now()
-                filename = "{}.jpg".format(ts.strftime("%M-%S"))
-                path = os.path.sep.join((outputPath, filename))
+                        outputPath = '../All_images/error_investigate'
+                        ts = datetime.datetime.now()
+                        filename = "{}-{:.2f}.jpg".format(ts.strftime("%M-%S"), error)
+                        path = os.path.sep.join((outputPath, filename))
 
-                cv2.putText(frame, str(error), (800, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
-                for i, pt in enumerate(plist):
-                    coord = f"{kp[0][pt][0]:.2f} {kp[0][pt][1]:.2f}"
-                    cv2.putText(frame, coord, (800, 150 + 30 * i), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1,
-                                cv2.LINE_AA)
-                vec = f"{error_vec[0]} {error_vec[1]} {error_vec[2]}"
-                cv2.putText(frame, vec, (800, 120 + 30 * (i+1)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1,
-                            cv2.LINE_AA)
+                        cv2.putText(frame, str(error), (800, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1,
+                                    cv2.LINE_AA)
+                        for i, pt in enumerate(plist):
+                            coord = f"{kp[0][pt][0]:.2f} {kp[0][pt][1]:.2f}"
+                            cv2.putText(frame, coord, (800, 150 + 30 * i), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1,
+                                        cv2.LINE_AA)
+                        vec = f"{error_vec[0]} {error_vec[1]} {error_vec[2]}"
+                        cv2.putText(frame, vec, (800, 150 + 30 * (i + 1)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1,
+                                    cv2.LINE_AA)
+                        cv2.imwrite(path, frame)
+                        print('Record')
 
-                cv2.imwrite(path, frame)
-                print('Good')
 
-        k = cv2.waitKey(30) & 0xFF
-        if k == 27 and est_state: #esc
-            outputPath = '../All_images/error_investigate'
-            ts = datetime.datetime.now()
-            filename = "{}.jpg".format(ts.strftime("%M-%S"))
-            path = os.path.sep.join((outputPath, filename))
+            cv2.imshow('Window', frame)
+            k = cv2.waitKey(30) & 0xFF
+            if k == 27:
+                # esc
+                est_state = not est_state
+            elif k == 13:
+                # enter
+                anchor += 1
+                print(f"Now point to hole {anchor}")
+    Tis.Stop_pipeline()
+    cv2.destroyAllWindows()
 
-            cv2.putText(frame, str(error), (800, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
-            for i, pt in enumerate(plist):
-                coord = f"{kp[0][pt][0]:.2f} {kp[0][pt][1]:.2f}"
-                cv2.putText(frame, coord, (800, 150+30*i), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1, cv2.LINE_AA)
-            vec = f"{error_vec[0]} {error_vec[1]} {error_vec[2]}"
-            cv2.putText(frame, vec, (800, 120 + 30 * (i + 1)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1,
-                        cv2.LINE_AA)
-            cv2.imwrite(path, frame)
-            print('Capture')
-        elif k == 13: #enter
-            anchor += 1
-            print(f"Now point to hole {anchor}")
 
+def realtime_error_show3D():
+    plt.ion()
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    num_lines = 1
+    color = ['red', 'green', 'blue', 'purple', 'orange']
+    lines = [ax.plot([], [], [], color='blue')[0] for i in range(num_lines)]
+    X, Y, Z = [], [], []
+
+    sq_len = 10
+    deep = 65
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_xlim(-sq_len, sq_len)
+    ax.set_ylim(40, deep)
+    ax.set_zlim(-sq_len, sq_len)
+
+    anchor = 1
+    mtx, dist = camera_para_retrieve()
+    Tis = TIS.TIS()
+    Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
+    Tis.Start_pipeline()
+    est_state = False
+
+    while True:
+        if Tis.Snap_image(1) is True:
+
+            frame = Tis.Get_image()
+            frame = frame[:, :, :3]
+            dis_frame = np.array(frame)
+            frame = undistort_img(dis_frame, mtx, dist)
+
+            diamondCorners, rvec, tvec = diamond_detection(dis_frame, mtx, dist)
+
+            outputs = predictor(frame)
+            kp_tensor = outputs["instances"].pred_keypoints
+            if kp_tensor.size(dim=0) == 0 or torch.isnan(kp_tensor).any():
+                continue
+
+            kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+            x = kp[0, :-1, 0]
+            y = kp[0, :-1, 1]
+
+
+            if isMonotonic(x) and isMonotonic(y):
+                for i in range(11):
+                    cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
+                    cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
+                                (0, 0, 255), 1, cv2.LINE_AA)
+                coord_3D = []
+                plist = [1, 4, 8]
+                dlists = [50, 60]
+                tip_offset = 2.2
+
+                for i in plist:
+                    pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
+                    coord_3D.append(pt)
+
+                tip, end = scale_estimation_multi(coord_3D[0], coord_3D[1], coord_3D[2], dlists[0], dlists[1],
+                                                  mtx, tip_offset)
+                error = error_calc_board(tip, anchor=anchor)
+                print(f'algo error: {error:.2f}')
+
+                if est_state:
+                    X.append(tip[0])
+                    Y.append(tip[2])
+                    Z.append(-tip[1])
+
+            lines[0].set_data(np.array(X).T, np.array(Y).T)
+            lines[0].set_3d_properties(np.array(Z).T)
+
+            board_coordinate = np.load("../Coordinate/board_coordinate.npy")
+            tip_b = board_coordinate[anchor]
+            ax.scatter(tip_b[0], tip_b[2], -tip_b[1], c='red', marker='*', s=30)
+
+            fig.canvas.draw()
+            fig.canvas.flush_events()
+
+            frameS = cv2.resize(frame, (1080, 810))
+            cv2.imshow('Window', frameS)
+
+            k = cv2.waitKey(30) & 0xFF
+            if k == 27:  # enter
+                anchor += 1
+                print(f"Now point to hole {anchor}")
+
+            elif k == 13:
+                # enter
+                est_state = not est_state
+                print('Start recording ')
 
     Tis.Stop_pipeline()
     cv2.destroyAllWindows()
 
+
+def realtime_error_show2D():
+    plt.ion()
+    fig = plt.figure()
+    ax = fig.add_subplot(121)
+    ax2 = fig.add_subplot(122)
+    anchor = 1
+
+    board_coordinate = np.load("../Coordinate/board_coordinate.npy")
+    tip_b = board_coordinate[anchor]
+    ax.scatter(tip_b[0], tip_b[1], c='red', marker='*', s=30)
+    ax2.scatter(tip_b[0], tip_b[2], c='red', marker='*', s=30)
+
+    mtx, dist = camera_para_retrieve()
+    Tis = TIS.TIS()
+    Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
+    Tis.Start_pipeline()
+    est_state = False
+
+    while True:
+        if Tis.Snap_image(1) is True:
+
+            frame = Tis.Get_image()
+            frame = frame[:, :, :3]
+            dis_frame = np.array(frame)
+            frame = undistort_img(dis_frame, mtx, dist)
+
+            outputs = predictor(frame)
+            kp_tensor = outputs["instances"].pred_keypoints
+            if kp_tensor.size(dim=0) != 0 or not torch.isnan(kp_tensor).all():
+                kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+                x = kp[0, :-1, 0]
+                y = kp[0, :-1, 1]
+
+                if isMonotonic(x) and isMonotonic(y):
+                    for i in range(11):
+                        cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
+                        cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
+                                    (0, 0, 255), 1, cv2.LINE_AA)
+                    coord_3D = []
+                    plist = [1, 4, 8]
+                    dlists = [50, 60]
+                    tip_offset = 2.2
+
+                    for i in plist:
+                        pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
+                        coord_3D.append(pt)
+
+                    tip, end = scale_estimation_multi(coord_3D[0], coord_3D[1], coord_3D[2], dlists[0], dlists[1],
+                                                      mtx, tip_offset)
+                    error = error_calc_board(tip, anchor=anchor)
+                    print(f'algo error: {error:.2f}')
+
+                    if est_state:
+                        if error < 0.8:
+                            ax.scatter(tip[0], tip[1], color='green')
+                            ax2.scatter(tip[0], tip[2], color='green')
+
+                        else:
+                            ax.scatter(tip[0], tip[1], color='blue')
+                            ax2.scatter(tip[0], tip[2], color='blue')
+
+
+
+
+            fig.canvas.draw()
+            fig.canvas.flush_events()
+
+            frameS = cv2.resize(frame, (1080, 810))
+            cv2.imshow('Window', frameS)
+
+            k = cv2.waitKey(30) & 0xFF
+            if k == 27:  # esc
+                print('recorded')
+
+            elif k == 13:
+                # enter
+                est_state = not est_state
+                print('Start recording ')
+
+    Tis.Stop_pipeline()
+    cv2.destroyAllWindows()
 
 def realtime_error_board_multi():
 
@@ -584,18 +745,16 @@ def realtime_error_board_multi():
 
     e_list = [0] * len(plists)
     eListcur = [0] * len(plists)
-    eListcur_r = [0] * len(plists)
-    e_list_r = [0] * len(plists)
+
     anchor = 1
     count = 0
     while True:
         if Tis.Snap_image(1) is True:
-            skip = False
+            reasonable = False
             frame = Tis.Get_image()
             frame = frame[:, :, :3]
             dis_frame = np.array(frame)
             frame = undistort_img(dis_frame, mtx, dist)
-            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
             outputs = predictor(frame)
             kp_tensor = outputs["instances"].pred_keypoints
@@ -622,11 +781,14 @@ def realtime_error_board_multi():
 
                         error = error_calc_board(tip, anchor=anchor)
                         if error < 10:
-                            resonable = True
+                            reasonable = True
                             e_list[j] += error
                             eListcur[j] = round(error, 2)
 
-                    if resonable:
+                        else:
+                            print('not recorded!', error)
+
+                    if reasonable:
                         count += 1
                         eList = [round(x / count, 2) for x in e_list]
                         print(eListcur, eList, count)
@@ -646,8 +808,8 @@ def realtime_error_board_multi():
 if __name__ == "__main__":
     # aruco_test()
     # arucoboard_test()
-    realtime_error_board_multi()
-    # realtime_error_board()
+    # realtime_error_board_multi()
+    realtime_error_show2D()
     # line_multi_video()
     # error_test_frame()
   # camera_para_retrieve()[ -0.0484527  -20.0817824   -2.91639071]z

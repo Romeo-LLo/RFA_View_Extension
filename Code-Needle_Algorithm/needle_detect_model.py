@@ -433,9 +433,13 @@ def realtime_visual():
     plt.ion()
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    lines = [ax.plot([], [], [])[0] for _ in range(2)]
-    sq_len = 10
-    deep = 80
+    num_lines = 2
+    color = ['red', 'green', 'blue', 'purple', 'orange']
+    lines = [ax.plot([], [], [], color[i])[0] for i in range(num_lines)]
+
+
+    sq_len = 15
+    deep = 70
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
@@ -443,7 +447,7 @@ def realtime_visual():
     ax.set_ylim(40, deep)
     ax.set_zlim(-sq_len, sq_len)
     num_steps = 10
-
+    anchor = 1
     mtx, dist = camera_para_retrieve()
     Tis = TIS.TIS()
     Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
@@ -461,61 +465,171 @@ def realtime_visual():
 
             outputs = predictor(frame)
             kp_tensor = outputs["instances"].pred_keypoints
-            if kp_tensor.size(dim=0) == 0 or torch.isnan(kp_tensor).any():
-                continue
+            if kp_tensor.size(dim=0) != 0 and not torch.isnan(kp_tensor).all():
 
-            kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
-            x = kp[0, :-1, 0]
-            y = kp[0, :-1, 1]
 
-            trajs = np.zeros((2, num_steps, 3))
+                kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+                x = kp[0, :-1, 0]
+                y = kp[0, :-1, 1]
 
-            if diamondCorners:
-                tip_t = pose_trans_needle(tvec, rvec, 21.2)
-                end_t = pose_trans_needle(tvec, rvec, 3)
-                trajs[0] = np.linspace(tip_t, end_t, num=num_steps)
-
-            if isMonotonic(x) and isMonotonic(y):
-                for i in range(11):
-                    cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
-                    cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
-                                (0, 0, 255), 1, cv2.LINE_AA)
-                coord_3D = []
-                plist = [2, 4, 6]
-
-                for i in plist:
-                    pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
-                    coord_3D.append(pt)
-
-                tip, end = scale_estimation(coord_3D[0], coord_3D[1], coord_3D[2], 40, 40, mtx)
-                trajs[1] = np.linspace(tip, end, num=num_steps)
+                trajs = np.zeros((num_lines, num_steps, 3))
 
                 if diamondCorners:
-                    angle_error, dist_error = error_calc(tip_t, end_t, tip, end)
+                    tip_a, end_a = pose_trans_needle(tvec, rvec)
+                    trajs[0] = np.linspace(tip_a, end_a, num=num_steps)
+                    error_a = error_calc_board(tip_a, anchor=anchor)
+                    # print('aruco error: ', error_a)
+                if isMonotonic(x) and isMonotonic(y):
+                    for i in range(11):
+                        cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
+                        cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
+                                    (0, 0, 255), 1, cv2.LINE_AA)
+                    coord_3D = []
+                    plist = [1, 4, 8]
+                    dlists = [50, 60]
+                    tip_offset = 2.2
 
-            for line, traj in zip(lines, trajs):
-                line.set_data(traj[:, 0], traj[:, 2])
-                line.set_3d_properties(-traj[:, 1])
+                    for i in plist:
+                        pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
+                        coord_3D.append(pt)
+
+                    tip, end = scale_estimation_multi(coord_3D[0], coord_3D[1], coord_3D[2], dlists[0], dlists[1],
+                                                      mtx, tip_offset)
+                    error = error_calc_board(tip, anchor=anchor)
+                    trajs[1] = np.linspace(tip, end, num=num_steps)
+                    print(f'algo error: {error:.2f}')
+
+
+                for line, traj in zip(lines, trajs):
+                    line.set_data(traj[:, 0], traj[:, 2])
+                    line.set_3d_properties(-traj[:, 1])
+
+            board_coordinate = np.load("../Coordinate/board_coordinate.npy")
+            tip_b = board_coordinate[anchor]
+            ax.scatter(tip_b[0], tip_b[2], -tip_b[1], c='purple', marker='*', s=30)
             fig.canvas.draw()
             fig.canvas.flush_events()
 
-
-
-            frameS = cv2.resize(frame, (900, 675))
-
+            frameS = cv2.resize(frame, (1080, 810))
             cv2.imshow('Window', frameS)
 
-            if cv2.waitKey(1) == ord('q'):
-                break
+            k = cv2.waitKey(30) & 0xFF
+            if k == 27:  # enter
+                anchor += 1
+                print(f"Now point to hole {anchor}")
+
     Tis.Stop_pipeline()
     cv2.destroyAllWindows()
 
+
+def realtime_visual_smooth():
+    plt.ion()
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    num_lines = 2
+    num_steps = 2
+
+    color = ['red', 'green']
+    lines = [ax.plot([], [], [], color[i])[0] for i in range(num_lines)]
+    trajs = np.zeros((num_lines, num_steps, 3))
+
+    sq_len = 15
+    deep = 70
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_xlim(-sq_len, sq_len)
+    ax.set_ylim(40, deep)
+    ax.set_zlim(-sq_len, sq_len)
+    num_steps = 2
+
+    sm_factor = 0.8
+    anchor = 1
+
+    mtx, dist = camera_para_retrieve()
+    Tis = TIS.TIS()
+    Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
+    Tis.Start_pipeline()
+    first = True
+
+    while True:
+        if Tis.Snap_image(1) is True:
+            frame = Tis.Get_image()
+            frame = frame[:, :, :3]
+            dis_frame = np.array(frame)
+            frame = undistort_img(dis_frame, mtx, dist)
+
+            diamondCorners, rvec, tvec = diamond_detection(dis_frame, mtx, dist)
+
+            outputs = predictor(frame)
+            kp_tensor = outputs["instances"].pred_keypoints
+            if kp_tensor.size(dim=0) != 0 and not torch.isnan(kp_tensor).all():
+
+                kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+                x = kp[0, :-1, 0]
+                y = kp[0, :-1, 1]
+
+
+                # if diamondCorners:
+                #     tip_a, end_a = pose_trans_needle(tvec, rvec)
+                #     trajs[0] = np.linspace(tip_a, end_a, num=num_steps)
+                #     error_a = error_calc_board(tip_a, anchor=anchor)
+                    # print('aruco error: ', error_a)
+                if isMonotonic(x) and isMonotonic(y):
+                    cv2.putText(frame, 'detected', (800, 120), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
+
+                    plist = [1, 4, 8]
+                    dlists = [50, 60]
+                    tip_offset = 2.2
+
+                    coord_3D = np.array([
+                        [kp[0][plist[0]][0], kp[0][plist[0]][1], 0],
+                        [kp[0][plist[1]][0], kp[0][plist[1]][1], 0],
+                        [kp[0][plist[2]][0], kp[0][plist[2]][1], 0]
+                    ])
+
+                    tip, end = scale_estimation_multi(coord_3D[0], coord_3D[1], coord_3D[2], dlists[0], dlists[1],
+                                                      mtx, tip_offset)
+                    error = error_calc_board(tip, anchor=anchor)
+                    if first:
+                        trajs[1] = np.array([tip, end])
+                        first = False
+                    else:
+                        sm_tip = trajs[1][0] * sm_factor + tip * (1 - sm_factor)
+                        sm_end = trajs[1][1] * sm_factor + end * (1 - sm_factor)
+                        trajs[1] = np.linspace(sm_tip, sm_end, num=num_steps)
+
+                    # print(f'algo error: {error:.2f}')
+
+                for line, traj in zip(lines, trajs):
+                    line.set_data(traj[:, 0], traj[:, 2])
+                    line.set_3d_properties(-traj[:, 1])
+
+            board_coordinate = np.load("../Coordinate/board_coordinate.npy")
+            tip_b = board_coordinate[anchor]
+            ax.scatter(tip_b[0], tip_b[2], -tip_b[1], c='purple', marker='*', s=30)
+            fig.canvas.draw()
+            fig.canvas.flush_events()
+
+            frameS = cv2.resize(frame, (1080, 810))
+            cv2.imshow('Window', frameS)
+
+            k = cv2.waitKey(30) & 0xFF
+            if k == 27:  # enter
+                anchor += 1
+                print(f"Now point to hole {anchor}")
+                first = True
+
+    Tis.Stop_pipeline()
+    cv2.destroyAllWindows()
+
+
 if __name__ == "__main__":
     # realtime_visual()
+    realtime_visual_smooth()
     # realtime()
     # realtime_draw_pts()
     # video()
     # video_visual()
-
     # frame()
-    test_algorithm()
+    # test_algorithm()
