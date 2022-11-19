@@ -373,9 +373,6 @@ def error_test_frame():
     #angle_error_list [12.9361107  11.16901311  9.38663259 18.2396625  22.17041563  8.92488851 22.06760178 23.31326559  7.13176133 12.75986461]
     #dist_error_list [3.78392626 3.07097142 3.07152368 4.86935637 6.72194453 2.80038621 6.26900182 8.82567047 2.7577783  3.20275442]
 
-
-
-
 def aruco_test():
     mtx, dist = camera_para_retrieve()
 
@@ -500,10 +497,10 @@ def realtime_error_snapshot():
                 y = kp[0, :-1, 1]
 
                 if isMonotonic(x) and isMonotonic(y):
-                    for i in range(11):
-                        cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 1, (0, 255, 0), -1)
-                        cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
-                                    (0, 0, 255), 1, cv2.LINE_AA)
+                    # for i in range(11):
+                        # cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 1, (0, 255, 0), -1)
+                        # cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
+                        #             (0, 0, 255), 1, cv2.LINE_AA)
 
                     plist = [1, 4, 8]
                     dlist = [50, 60]
@@ -523,22 +520,27 @@ def realtime_error_snapshot():
 
                     if est_state:
 
-                        outputPath = '../All_images/error_investigate'
+                        outputPath = '../All_images/edge_investigate/Nolables'
                         ts = datetime.datetime.now()
                         filename = "{}-{:.2f}.jpg".format(ts.strftime("%M-%S"), error)
                         path = os.path.sep.join((outputPath, filename))
 
-                        cv2.putText(frame, str(error), (800, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1,
-                                    cv2.LINE_AA)
-                        for i, pt in enumerate(plist):
-                            coord = f"{kp[0][pt][0]:.2f} {kp[0][pt][1]:.2f}"
-                            cv2.putText(frame, coord, (800, 150 + 30 * i), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1,
-                                        cv2.LINE_AA)
-                        vec = f"{error_vec[0]} {error_vec[1]} {error_vec[2]}"
-                        cv2.putText(frame, vec, (800, 150 + 30 * (i + 1)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1,
-                                    cv2.LINE_AA)
+                        # cv2.putText(frame, str(error), (800, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1,
+                        #             cv2.LINE_AA)
+                        # for i, pt in enumerate(plist):
+                        #     coord = f"{kp[0][pt][0]:.2f} {kp[0][pt][1]:.2f}"
+                        #     cv2.putText(frame, coord, (800, 150 + 30 * i), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1,
+                        #                 cv2.LINE_AA)
+                        # vec = f"{error_vec[0]} {error_vec[1]} {error_vec[2]}"
+                        # pos = f"{tip[0]:.2f} {tip[1]:.2f} {tip[2]:.2f}"
+
+                        # cv2.putText(frame, vec, (800, 150 + 30 * (i + 1)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1,
+                        #             cv2.LINE_AA)
+                        # cv2.putText(frame, pos, (800, 150 + 30 * (i + 2)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1,
+                        #             cv2.LINE_AA)
                         cv2.imwrite(path, frame)
                         print('Record')
+                        est_state = False
 
 
             cv2.imshow('Window', frame)
@@ -711,9 +713,6 @@ def realtime_error_show2D():
                             ax.scatter(tip[0], tip[1], color='blue')
                             ax2.scatter(tip[0], tip[2], color='blue')
 
-
-
-
             fig.canvas.draw()
             fig.canvas.flush_events()
 
@@ -809,7 +808,7 @@ if __name__ == "__main__":
     # aruco_test()
     # arucoboard_test()
     # realtime_error_board_multi()
-    realtime_error_show2D()
+    realtime_error_snapshot()
+    # realtime_error_show2D()
     # line_multi_video()
     # error_test_frame()
-  # camera_para_retrieve()[ -0.0484527  -20.0817824   -2.91639071]z

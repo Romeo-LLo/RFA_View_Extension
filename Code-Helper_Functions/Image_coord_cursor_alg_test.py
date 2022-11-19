@@ -10,9 +10,9 @@ from Linear_equation_temp import *
 
 num_pt = 3
 # coordinates = np.zeros((num_pt, 3), dtype='float64')
-coordinates = np.array([[489, 737, 0],
-                        [443, 554, 0],
-                        [395, 389, 0]], dtype='float64')
+coordinates = np.array([[708, 818, 0],
+                        [658, 612, 0],
+                        [598, 385, 0]], dtype='float64')
 index = 0
 
 def click_event(event, x, y, flags, params):
@@ -24,8 +24,7 @@ def click_event(event, x, y, flags, params):
             coordinates_ready = coordinates.copy()
             print(coordinates_ready)
 
-            scale_estimation_multi(coordinates_ready[0], coordinates_ready[1], coordinates_ready[2], 50, 50, mtx, 3.2)
-
+            scale_estimation_multi(coordinates_ready[0], coordinates_ready[1], coordinates_ready[2], 50, 60, mtx, 2.2)
         if y > button2[0] and y < button2[1] and x > button2[2] and x < button2[3]:
             print("current index", index)
             if index >= num_pt - 1:
@@ -81,31 +80,12 @@ def click_event(event, x, y, flags, params):
 
         cv2.imshow('image', combine_img)
 
-def window_init():
-    img = cv2.imread('../All_images/16.jpg')
-
-    bt_size = 150
-
-    control_image = np.zeros((img.shape[0], bt_size, 3), np.uint8)
-    control_image[:bt_size, :bt_size, :] = 180
-    cv2.putText(control_image, 'Calculate', (0, 50), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 0), 1)
-
-    control_image[bt_size:2 * bt_size, :bt_size, :] = 100
-    cv2.putText(control_image, 'Next point', (0, 50 + bt_size), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 0), 1)
-
-    control_image[2 * bt_size:3 * bt_size, :bt_size, :] = 150
-    cv2.putText(control_image, 'Clear points', (0, 50 + 2 * bt_size), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 0), 1)
-
-    combine_img_sub = np.concatenate((img, control_image), axis=1)
-
-    return combine_img_sub
-
 
 # driver function
 if __name__ == "__main__":
 
     # y 768 x 1024
-    img = cv2.imread('../All_images/error_investigate/41-16.jpg')
+    img = cv2.imread('../All_images/error_investigate/39-43-2.40.jpg')
 
     mtx, dist = camera_para_retrieve()
     # diamondCorners, rvec, tvec = diamond_detection(img, mtx, dist)

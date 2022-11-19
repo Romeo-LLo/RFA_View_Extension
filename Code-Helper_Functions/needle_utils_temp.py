@@ -493,7 +493,7 @@ def orth_fit(kp):
 def error_calc_board(tip):
 
     board_coordinate = np.load("../Coordinate/board_coordinate.npy")
-    tip_b = board_coordinate[1]
+    tip_b = board_coordinate[2]
     error = np.linalg.norm(tip_b - tip)
 
     print(f"error : {error}")

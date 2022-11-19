@@ -545,6 +545,7 @@ def realtime_visual_smooth():
 
     sm_factor = 0.8
     anchor = 1
+    scale = 0.5
 
     mtx, dist = camera_para_retrieve()
     Tis = TIS.TIS()
@@ -565,18 +566,23 @@ def realtime_visual_smooth():
             kp_tensor = outputs["instances"].pred_keypoints
             if kp_tensor.size(dim=0) != 0 and not torch.isnan(kp_tensor).all():
 
+
                 kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
                 x = kp[0, :-1, 0]
                 y = kp[0, :-1, 1]
 
-
-                # if diamondCorners:
-                #     tip_a, end_a = pose_trans_needle(tvec, rvec)
-                #     trajs[0] = np.linspace(tip_a, end_a, num=num_steps)
-                #     error_a = error_calc_board(tip_a, anchor=anchor)
+                for i in range(11):
+                    cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
+                    cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
+                                (0, 0, 255), 1, cv2.LINE_AA)
+                if diamondCorners:
+                    tip_a, end_a = pose_trans_needle(tvec, rvec)
+                    trajs[0] = np.linspace(tip_a, end_a, num=num_steps)
+                    # error_a = error_calc_board(tip_a, anchor=anchor)
                     # print('aruco error: ', error_a)
-                if isMonotonic(x) and isMonotonic(y):
-                    cv2.putText(frame, 'detected', (800, 120), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
+
+                if isMonotonic(x[[1, 4, 8]]) and isMonotonic(y[[1, 4, 8]]):
+                    cv2.circle(frame, (20, 120), 40, (0, 0, 255), -1)
 
                     plist = [1, 4, 8]
                     dlists = [50, 60]
@@ -598,8 +604,9 @@ def realtime_visual_smooth():
                         sm_tip = trajs[1][0] * sm_factor + tip * (1 - sm_factor)
                         sm_end = trajs[1][1] * sm_factor + end * (1 - sm_factor)
                         trajs[1] = np.linspace(sm_tip, sm_end, num=num_steps)
-
                     # print(f'algo error: {error:.2f}')
+                else:
+                    cv2.circle(frame, (20, 120), 20, (255, 0, 0), -1)
 
                 for line, traj in zip(lines, trajs):
                     line.set_data(traj[:, 0], traj[:, 2])
@@ -611,7 +618,7 @@ def realtime_visual_smooth():
             fig.canvas.draw()
             fig.canvas.flush_events()
 
-            frameS = cv2.resize(frame, (1080, 810))
+            frameS = cv2.resize(frame, (int(1440*scale), int(1080*scale)))
             cv2.imshow('Window', frameS)
 
             k = cv2.waitKey(30) & 0xFF

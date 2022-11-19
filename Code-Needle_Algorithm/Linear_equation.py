@@ -83,10 +83,6 @@ def scale_estimation_multi(q1, q2, q3, d1, d2, mtx, tip_offset):
     scale = mtx[0][0]
     x_scale = f / scale
     y_scale = f / scale
-    # x_scale = (3.45 / 1000)  # pixel size : 3.45 Micrometer = 0.00345 mm
-    # y_scale = (3.45 / 1000)  # In mtx, both are 2394.248
-    # xp = mtx[0][2] * x_scale
-    # yp = mtx[1][2] * y_scale
 
     scale = np.array([x_scale, y_scale, 0])
     trans = np.array([mtx[0][2], mtx[1][2], 0])
@@ -151,10 +147,11 @@ def scale_estimation_multi(q1, q2, q3, d1, d2, mtx, tip_offset):
 
 
 
-def scale_estimation_4p(q1, q2, q3, q4, d1, d2, d3, mtx):
-    x_scale = (3.45 / 1000)  # pixel size : 3.45 Micrometer = 0.00345 mm
-    y_scale = (3.45 / 1000)  # In mtx, both are 2394.248
+def scale_estimation_4p(q1, q2, q3, q4, d1, d2, d3, mtx, tip_offset):
     f = 8
+    scale = mtx[0][0]
+    x_scale = f / scale
+    y_scale = f / scale
 
     scale = np.array([x_scale, y_scale, 0])
     trans = np.array([mtx[0][2], mtx[1][2], 0])
@@ -198,17 +195,20 @@ def scale_estimation_4p(q1, q2, q3, q4, d1, d2, d3, mtx):
         [0, d3 * a2, -d2 * a3 - d3 * a3, d2 * a4],
         [0, d3 * b2, -d2 * b3 - d3 * b3, d2 * b4]
     ])
-    ns = null_space(S)
+    # ns = null_space(S)
+
+    # still not work
+    zeroM = np.zeros((len(S), 1))
+    ns = np.linalg.lstsq(S, zeroM, rcond=None)
+    print(ns)
 
     # check
 
     d1p = np.linalg.norm(ns[0] * v1 - ns[1] * v2, axis=0)
-    d2p = np.linalg.norm(ns[1] * v2 - ns[2] * v3, axis=0)
-    d3p = np.linalg.norm(ns[2] * v2 - ns[3] * v4, axis=0)
+
 
     scale_1 = d1 / d1p
-    scale_2 = d2 / d2p
-    scale_3 = d3 / d3p
+
 
     s1 = ns[0] * scale_1
     s2 = ns[1] * scale_1
@@ -220,7 +220,11 @@ def scale_estimation_4p(q1, q2, q3, q4, d1, d2, d3, mtx):
     p3 = 0.1 * (F + v3 * s3) * np.array([-1, -1, 1])
     p4 = 0.1 * (F + v4 * s4) * np.array([-1, -1, 1])
 
-    return p1
+
+    unit = (p2 - p1) / np.linalg.norm((p2 - p1), axis=0)
+    tip = p1 - unit * tip_offset
+    end = p1 + unit * (21.2 - tip_offset)
+    return tip, end
 
 
 def aruco(frame, mtx, dist):

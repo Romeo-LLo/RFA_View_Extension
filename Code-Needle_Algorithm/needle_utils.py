@@ -8,7 +8,7 @@ from matplotlib.patches import Circle
 from scipy.signal import argrelextrema, find_peaks
 import bisect
 import cv2.aruco as aruco
-# from bresenham import bresenham
+from bresenham import bresenham
 from scipy import odr
 
 pixel_lower_thres = 20
@@ -523,7 +523,7 @@ def board_offset(rvec, tvec):
     r_matrix, _ = cv2.Rodrigues(rvec)
 
     board_len = 4.5
-    offsets = np.array([[0, 0, 0], [2*board_len, 0, 0], [3*board_len, 0, 0], [4*board_len, board_len, 0], [5*board_len, board_len, 0]])
+    offsets = np.array([[0, 0, 0], [1*board_len, 0, 0], [3*board_len, 0, 0], [4*board_len, board_len, 0], [5*board_len, board_len, 0]])
 
     coord3D = np.zeros((5, 3))
     for i, offset in enumerate(offsets):

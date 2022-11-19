@@ -141,11 +141,11 @@ def scale_estimation_multi(q1, q2, q3, d1, d2, mtx, tip_offset):
     error2 = error_calc_board(tip2)
 
 
-
-def scale_estimation_4p(q1, q2, q3, q4, d1, d2, d3, mtx):
-    x_scale = (3.45 / 1000)  # pixel size : 3.45 Micrometer = 0.00345 mm
-    y_scale = (3.45 / 1000)  # In mtx, both are 2394.248
+def scale_estimation_4p(q1, q2, q3, q4, d1, d2, d3, mtx, tip_offset):
     f = 8
+    scale = mtx[0][0]
+    x_scale = f / scale
+    y_scale = f / scale
 
     scale = np.array([x_scale, y_scale, 0])
     trans = np.array([mtx[0][2], mtx[1][2], 0])
@@ -189,7 +189,9 @@ def scale_estimation_4p(q1, q2, q3, q4, d1, d2, d3, mtx):
         [0, d3 * a2, -d2 * a3 - d3 * a3, d2 * a4],
         [0, d3 * b2, -d2 * b3 - d3 * b3, d2 * b4]
     ])
-    ns = null_space(S)
+    # ns = null_space(S)
+    ns = np.linalg.lstsq(S, 0, rcond=None)[0]
+    print(ns)
 
     # check
 
@@ -211,8 +213,11 @@ def scale_estimation_4p(q1, q2, q3, q4, d1, d2, d3, mtx):
     p3 = 0.1 * (F + v3 * s3) * np.array([-1, -1, 1])
     p4 = 0.1 * (F + v4 * s4) * np.array([-1, -1, 1])
 
-    return p1
 
+    unit = (p2 - p1) / np.linalg.norm((p2 - p1), axis=0)
+    tip = p1 - unit * tip_offset
+    end = p1 + unit * (21.2 - tip_offset)
+    return tip, end
 
 def aruco(frame, mtx, dist):
 
