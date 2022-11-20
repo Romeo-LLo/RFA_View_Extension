@@ -410,22 +410,22 @@ def corner_refinement(src_gray, corners):
     return rf_corners
 
 # find the closet point on the fit line
-def line_fit(x, y):
+def line_polyfit(x, y):
 
     (m, b), res = np.polyfit(x, y, 1, full=True)[:2]
-    print('res', res)
-    # p = np.poly1d(coeff)
-    # p1, p2 = p(1), p(100) #dummy value
+    # print('res', res)
 
-    fit_kp = np.zeros((1, x.shape[0], 2))
 
-    for i in range(x.shape[0]):
-        x_fit = (m * y[i] + x[i] - m * b) / (m * m + 1)
-        y_fit = (m * m * y[i] + m * x[i] + b) / (m * m + 1)
-        fit_kp[0][i][0] = x_fit
-        fit_kp[0][i][1] = y_fit
-
-    return fit_kp
+    # fit_kp = np.zeros((1, x.shape[0], 2))
+    #
+    # for i in range(x.shape[0]):
+    #     x_fit = (m * y[i] + x[i] - m * b) / (m * m + 1)
+    #     y_fit = (m * m * y[i] + m * x[i] + b) / (m * m + 1)
+    #     fit_kp[0][i][0] = x_fit
+    #     fit_kp[0][i][1] = y_fit
+    #
+    # return fit_kp
+    return m, b
 
 def partial_line_fit(all_x, all_y, plist):
     # here we directly transfer to 3D points

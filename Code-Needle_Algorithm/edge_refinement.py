@@ -41,7 +41,7 @@ def detect():
     path = '../All_images/edge_investigate/Nolables'
     images = glob.glob('../All_images/edge_investigate/Nolables/*.jpg')
 
-    # frame = cv2.imread('../All_images/edge_investigate/Nolables/32-45-12.24.jpg')
+    # frame = cv2.imread('../All_images/edge_investigate/Nolables/32-36-17.39.jpg')
 
     for img in images:
         frame = cv2.imread(img)
@@ -55,61 +55,27 @@ def detect():
             x = kp[0, :-1, 0]
             y = kp[0, :-1, 1]
 
+            m, b = line_fit(x, y)
+            dx = x[1] - x[4]
+            dy = y[1] - y[4]
             for i in range(1, 11):
                 cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 1, (0, 255, 0), -1)
+                kernel = kernel_choice(m, i, dx, dy)
 
-                rf_x, rf_y = edge_refinement(gray_frame, x[i], y[i], i)
+                rf_x, rf_y = edge_refinement(gray_frame, x[i], y[i], kernel)
                 # print(x[i], y[i], rf_x, rf_y)
                 cv2.circle(frame, (rf_x, rf_y), 1, (0, 0, 255), -1)
                 cv2.putText(frame, str(i), (rf_x, rf_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
                             (0, 0, 255), 1, cv2.LINE_AA)
 
-        # cv2.imshow('Window', frame)
-        # cv2.waitKey(0)
+            cv2.imshow('Window', frame)
+            cv2.waitKey(0)
 
 
-def edge_refinement(gray_frame, x, y, id):
+def edge_refinement(gray_frame, x, y, kernel):
 
     region_size = 6
     h, w = gray_frame.shape
-    # kernel = np.concatenate((np.full((3, 5), -1), np.full((2, 5), 1)), axis=0)
-    if id % 2 == 0:
-        # kernel = np.array([[1, 1, 1, 1, 1],
-        #                    [1, 1, 1, 1, 1],
-        #                    [0, 0, 0, 0, 0],
-        #                    [-1, -1, -1, -1, -1],
-        #                    [-1, -1, -1, -1, -1]])
-
-        # kernel = np.array([[ 0,  1,  1,  1,  1],
-        #                    [-1,  0,  1,  1,  1],
-        #                    [-1, -1,  0,  1,  1],
-        #                    [-1, -1, -1,  0,  1],
-        #                    [-1, -1, -1, -1,  0]])
-
-        kernel = np.array([[1, 1,   1,  1,  0],
-                           [1, 1,   1,  0, -1],
-                           [1, 1,   0, -1, -1],
-                           [1, 0,  -1, -1, -1],
-                           [0, -1, -1, -1, -1]])
-
-    else:
-        # kernel = np.array([[-1, -1, -1, -1, -1],
-        #                    [-1, -1, -1, -1, -1],
-        #                    [0, 0, 0, 0, 0],
-        #                    [1, 1, 1, 1, 1],
-        #                    [1, 1, 1, 1, 1]])
-        # kernel = np.array([[0, -1, -1, -1, -1],
-        #                    [1,  0, -1, -1, -1],
-        #                    [1,  1,  0, -1, -1],
-        #                    [1,  1,  1,  0, -1],
-        #                    [1,  1,  1,  1,  0]])
-
-        kernel = np.array([[-1, -1, -1, -1,  0],
-                           [-1, -1, -1,  0,  1],
-                           [-1, -1,  0,  1,  1],
-                           [-1,  0,  1,  1,  1],
-                           [0,   1,  1,  1,  1]])
-
 
     tlx = max(round(x - region_size), 0)
     tly = max(round(y - region_size), 0)
@@ -122,19 +88,12 @@ def edge_refinement(gray_frame, x, y, id):
     conv = convolve2D(region, kernel)
 
 
-    # plt.subplot(1, 3, 1), plt.imshow(region, cmap='gray')
-    # plt.title('Region'), plt.xticks([]), plt.yticks([])
-    # plt.subplot(1, 3, 2), plt.imshow(conv, cmap='gray')
-    # plt.title('Conv'), plt.xticks([]), plt.yticks([])
-    #
-    # plt.show()
     reg_max = np.unravel_index(np.argmax(conv, axis=None), conv.shape)
 
-    cv2.circle(region, (reg_max[1]+2, reg_max[0]+2), 1, (0, 255, 0), -1)
-    #
-    cv2.imshow('123', region)
-    cv2.waitKey(0)
-    rf_x = round(x - region_size + reg_max[1] + 2)
+    # cv2.circle(region, (reg_max[1]+2, reg_max[0]+2), 1, (0, 255, 0), -1)
+    # cv2.imshow('123', region)
+    # cv2.waitKey(0)
+    rf_x = round(x - region_size + reg_max[1] + 2) # 2 is not correct if touching (0, 0)
     rf_y = round(y - region_size + reg_max[0] + 2)
     return rf_x, rf_y
 
@@ -180,48 +139,51 @@ def convolve2D(image, kernel, padding=0, strides=1):
 
     return output
 
-#
-# def convolve2D(image, kernel, padding=2, strides=1):
-#     # Cross Correlation
-#     # kernel = np.flipud(np.fliplr(kernel))
-#
-#     # Gather Shapes of Kernel + Image + Padding
-#     xKernShape = kernel.shape[0]
-#     yKernShape = kernel.shape[1]
-#     xImgShape = image.shape[0]
-#     yImgShape = image.shape[1]
-#
-#     # Shape of Output Convolution
-#     xOutput = int(((xImgShape - xKernShape + 2 * padding) / strides) + 1)
-#     yOutput = int(((yImgShape - yKernShape + 2 * padding) / strides) + 1)
-#     output = np.zeros((xOutput, yOutput))
-#
-#     # Apply Equal Padding to All Sides
-#     if padding != 0:
-#         imagePadded = np.zeros((image.shape[0] + padding*2, image.shape[1] + padding*2))
-#         imagePadded[int(padding):int(-1 * padding), int(padding):int(-1 * padding)] = image
-#         print(imagePadded)
-#     else:
-#         imagePadded = image
-#
-#     # Iterate through image
-#     for y in range(image.shape[1]):
-#         # Exit Convolution
-#         if y > image.shape[1] - yKernShape:
-#             break
-#         # Only Convolve if y has gone down by the specified Strides
-#         if y % strides == 0:
-#             for x in range(image.shape[0]):
-#                 # Go to next row once kernel is out of bounds
-#                 if x > image.shape[0] - xKernShape:
-#                     break
-#                 try:
-#                     # Only Convolve if x has moved by the specified Strides
-#                     if x % strides == 0:
-#                         output[x, y] = (kernel * imagePadded[x: x + xKernShape, y: y + yKernShape]).sum()
-#                 except:
-#                     break
-#
-#     return output
+
+def kernel_choice(m, i, dx, dy):
+    s1 = math.tan(math.pi/8)
+    s2 = math.tan(math.pi*3/8)
+    if -s1 <= m <= s1:
+        kernel = np.array([[1, 1, 0, -1, -1],
+                           [1, 1, 0, -1, -1],
+                           [1, 1, 0, -1, -1],
+                           [1, 1, 0, -1, -1],
+                           [1, 1, 0, -1, -1]])
+        if dx > 0:
+            kernel *= -1
+
+    elif s1 < m <= s2:
+        kernel = np.array([[-1, -1, -1, -1,  0],
+                           [-1, -1, -1,  0,  1],
+                           [-1, -1,  0,  1,  1],
+                           [-1,  0,  1,  1,  1],
+                           [0,   1,  1,  1,  1]])
+        if dy < 0:
+            kernel *= -1
+
+    elif -s2 <= m < -s1:
+        kernel = np.array([[0, -1, -1, -1, -1],
+                           [1,  0, -1, -1, -1],
+                           [1,  1,  0, -1, -1],
+                           [1,  1,  1,  0, -1],
+                           [1,  1,  1,  1,  0]])
+        if dx > 0:
+            kernel *= -1
+    else:
+        kernel = np.array([[-1, -1, -1, -1, -1],
+                           [-1, -1, -1, -1, -1],
+                           [0, 0, 0, 0, 0],
+                           [1, 1, 1, 1, 1],
+                           [1, 1, 1, 1, 1]])
+        if dy < 0:
+            kernel *= -1
+
+
+
+    return kernel
+
+
+
+
 if __name__ == "__main__":
     detect()

@@ -9,6 +9,7 @@ from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from needle_utils import *
 from Linear_equation import *
+from edge_refinement import *
 import torch
 import gi
 import cv2.aruco as aruco
@@ -738,9 +739,9 @@ def realtime_error_board_multi():
     Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
     Tis.Start_pipeline()
 
-    plists = [[1, 4, 7], [1, 4, 8]]
-    dlists = [[50, 50], [50, 60]]
-    tip_offset = [2.2, 2.2]
+    plists = [[2, 4, 7], [1, 4, 8]]
+    dlists = [[40, 50], [50, 60]]
+    tip_offset = [3.2, 2.2]
 
     e_list = [0] * len(plists)
     eListcur = [0] * len(plists)
@@ -803,12 +804,122 @@ def realtime_error_board_multi():
     cv2.destroyAllWindows()
 
 
+def realtime_error_board_refinement():
+    mtx, dist = camera_para_retrieve()
+    Tis = TIS.TIS()
+    Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
+    Tis.Start_pipeline()
+
+    plist = [2, 4, 7]
+    dlist = [40, 50]
+    tip_offset = 3.2
+
+    e_list = [0] * 2
+    eListcur = [0] * 2
+
+    anchor = 1
+    count = 0
+    est_state = False
+
+    while True:
+        if Tis.Snap_image(1) is True:
+            reasonable = False
+            frame = Tis.Get_image()
+            frame = frame[:, :, :3]
+            dis_frame = np.array(frame)
+            frame = undistort_img(dis_frame, mtx, dist)
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            outputs = predictor(frame)
+            kp_tensor = outputs["instances"].pred_keypoints
+            if kp_tensor.size(dim=0) != 0 or not torch.isnan(kp_tensor).all():
+
+                kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+                x = kp[0, :-1, 0]
+                y = kp[0, :-1, 1]
+
+                m, b = line_polyfit(x, y)
+                dx = x[2] - x[4]
+                dy = y[2] - y[4]
+
+                if isMonotonic(x) and isMonotonic(y):
+                    for i in range(11):
+                        cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 1, (0, 255, 0), -1)
+                        cv2.putText(frame, str(i), (round(kp[0][i][0]), round(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                                    (0, 255, 0), 1, cv2.LINE_AA)
+
+                    kernel = kernel_choice(m, i, dx, dy)
+                    coord_3D = []
+                    coord_3D_rf = []
+
+                    for i in plist:
+
+                        if i % 2 == 0:
+                            rf_x, rf_y = edge_refinement(gray_frame, x[i], y[i], np.negative(kernel))
+                        else:
+                            rf_x, rf_y = edge_refinement(gray_frame, x[i], y[i], kernel)
+
+                        cv2.circle(frame, (rf_x, rf_y), 1, (0, 0, 255), -1)
+
+                        pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
+                        coord_3D.append(pt)
+
+                        pt_rf = np.array([rf_x, rf_y, 0], dtype='float64')
+                        coord_3D_rf.append(pt_rf)
+
+                    tip, end = scale_estimation_multi(coord_3D[0], coord_3D[1], coord_3D[2], dlist[0], dlist[1],
+                                                      mtx, tip_offset)
+                    tip_rf, end_rf = scale_estimation_multi(coord_3D_rf[0], coord_3D_rf[1], coord_3D_rf[2], dlist[0],
+                                                      dlist[1], mtx, tip_offset)
+                    error = error_calc_board(tip, anchor=anchor)
+                    error_rf = error_calc_board(tip_rf, anchor=anchor)
+
+                    e_list[0] += error
+                    e_list[1] += error_rf
+
+                    eListcur[0] = round(error, 2)
+                    eListcur[1] = round(error_rf, 2)
+                    count += 1
+                    eList = [round(x / count, 2) for x in e_list]
+                    print(eListcur, eList, count)
+
+
+                    if est_state:
+
+                        outputPath = '../All_images/edge_investigate/Refine'
+                        ts = datetime.datetime.now()
+                        filename = "{}-{:.2f}.jpg".format(ts.strftime("%M-%S"), error)
+                        path = os.path.sep.join((outputPath, filename))
+                        cv2.putText(frame, str(round(error, 2)), (800, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 1,
+                                    cv2.LINE_AA)
+
+                        cv2.putText(frame, str(round(error_rf, 2)), (800, 150), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1,
+                                    cv2.LINE_AA)
+
+                        cv2.imwrite(path, frame)
+                        print('Record')
+                        est_state = False
+
+
+        frameS = cv2.resize(frame, (1080, 810))
+        cv2.imshow('Window', frameS)
+
+        k = cv2.waitKey(30) & 0xFF
+        if k == 27:
+            anchor += 1
+            print(f"Now point to hole {anchor}")
+        elif k == 13:
+            est_state = True
+
+    Tis.Stop_pipeline()
+    cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     # aruco_test()
     # arucoboard_test()
+    realtime_error_board_refinement()
     # realtime_error_board_multi()
-    realtime_error_snapshot()
+    # realtime_error_snapshot()
     # realtime_error_show2D()
     # line_multi_video()
     # error_test_frame()
