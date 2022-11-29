@@ -136,7 +136,7 @@ def scale_estimation_multi(q1, q2, q3, d1, d2, mtx, tip_offset):
 
 
     board_coordinate = np.load("../Coordinate/board_coordinate.npy")
-    tip_b = board_coordinate[1]
+    tip_b = board_coordinate[2]
     error1 = error_calc_board(tip1)
     error2 = error_calc_board(tip2)
 

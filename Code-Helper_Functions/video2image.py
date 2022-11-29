@@ -12,7 +12,7 @@ squareLength = 1.3
 markerLength = 0.9
 arucoParams = aruco.DetectorParameters_create()
 
-cap = cv2.VideoCapture('../All_images/needle_trans3.mp4')
+cap = cv2.VideoCapture('../All_images/offset_end.mp4')
 count = 0
 while cap.isOpened():
     ret, image = cap.read()
@@ -22,7 +22,7 @@ while cap.isOpened():
         if corners:
             diamondCorners, diamondIds = aruco.detectCharucoDiamond(image, corners, ids, squareLength / markerLength)
             if diamondCorners:
-                cv2.imwrite("../All_images/offset3/frame%d.jpg" % count, image)  # save frame as JPG file
+                cv2.imwrite("../All_images/offset_end1129/frame%d.jpg" % count, image)  # save frame as JPG file
                 print(count)
                 count += 1
 cap.release()

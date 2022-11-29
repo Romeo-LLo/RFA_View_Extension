@@ -740,8 +740,9 @@ def realtime_error_board_multi():
     Tis.Start_pipeline()
 
     plists = [[2, 4, 7], [1, 4, 8]]
-    dlists = [[40, 50], [50, 60]]
-    tip_offset = [3.2, 2.2]
+    dlists = [[38, 48], [48, 57.5]]
+    # dlists = [[40, 50], [50, 60]]
+    tip_offset = [3.2, 2.25]
 
     e_list = [0] * len(plists)
     eListcur = [0] * len(plists)
@@ -791,7 +792,7 @@ def realtime_error_board_multi():
                     if reasonable:
                         count += 1
                         eList = [round(x / count, 2) for x in e_list]
-                        print(eListcur, eList, count)
+                        print(eListcur[0], eList[0], count)
 
         frameS = cv2.resize(frame, (1080, 810))
         cv2.imshow('Window', frameS)
@@ -855,9 +856,9 @@ def realtime_error_board_refinement():
                     for i in plist:
 
                         if i % 2 == 0:
-                            rf_x, rf_y = edge_refinement(gray_frame, x[i], y[i], np.negative(kernel))
+                            rf_x, rf_y = edge_refinement_conv(gray_frame, x[i], y[i], np.negative(kernel))
                         else:
-                            rf_x, rf_y = edge_refinement(gray_frame, x[i], y[i], kernel)
+                            rf_x, rf_y = edge_refinement_conv(gray_frame, x[i], y[i], kernel)
 
                         cv2.circle(frame, (rf_x, rf_y), 1, (0, 0, 255), -1)
 
@@ -917,9 +918,9 @@ def realtime_error_board_refinement():
 if __name__ == "__main__":
     # aruco_test()
     # arucoboard_test()
-    realtime_error_board_refinement()
     # realtime_error_board_multi()
-    # realtime_error_snapshot()
+    # realtime_error_board_refinement()
+    realtime_error_snapshot()
     # realtime_error_show2D()
     # line_multi_video()
     # error_test_frame()

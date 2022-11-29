@@ -62,7 +62,7 @@ def detect():
                 cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 1, (0, 255, 0), -1)
                 kernel = kernel_choice(m, i, dx, dy)
 
-                rf_x, rf_y = edge_refinement(gray_frame, x[i], y[i], kernel)
+                rf_x, rf_y = edge_refinement_conv(gray_frame, x[i], y[i], kernel)
                 # print(x[i], y[i], rf_x, rf_y)
                 cv2.circle(frame, (rf_x, rf_y), 1, (0, 0, 255), -1)
                 cv2.putText(frame, str(i), (rf_x, rf_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
@@ -72,7 +72,108 @@ def detect():
             cv2.waitKey(0)
 
 
-def edge_refinement(gray_frame, x, y, kernel):
+
+def detect_linear():
+    images = glob.glob('../All_images/edge_investigate/Blank/*.jpg')
+
+    for img in images:
+        frame = cv2.imread(img)
+
+        # frame = cv2.imread('../All_images/edge_investigate/Blank/50-13-11.78.jpg')
+        plist = [1, 4, 8]
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        outputs = predictor(frame)
+        kp_tensor = outputs["instances"].pred_keypoints
+        if kp_tensor.size(dim=0) != 0 or not torch.isnan(kp_tensor).all():
+
+            kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+            x = kp[0, :-1, 0]
+            y = kp[0, :-1, 1]
+
+            # m, b = line_polyfit(x, y)
+            # p1 = (0, round(b))
+            # p2 = (1000, round(m * 1000 + b))
+            # cv2.line(frame, p1, p2, (0, 0, 255), 1, cv2.LINE_AA)
+            #
+            # for i in range(1, 11):
+            #     cv2.circle(frame, (round(kp[0][i][0]), round(kp[0][i][1])), 1, (0, 255, 0), -1)
+
+            refine_corners = edge_refinement_linear_display(frame, gray_frame, x, y, plist)
+            for corner in refine_corners:
+                cv2.circle(frame, (round(corner[0]), round(corner[1])), 1, (255, 0, 0), -1)
+
+            cv2.imshow('Window', frame)
+            cv2.waitKey(0)
+
+
+def edge_refinement_linear_display(color_frame, gray_frame, x, y, plist):
+    win = 5
+
+    m, b = np.polyfit(x, y, 1)
+    end_pts = line_end_points_on_image(m, b, gray_frame.shape, True)
+    gray_pt_set = list(bresenham(end_pts[0][0], end_pts[0][1], end_pts[1][0], end_pts[1][1]))
+    gray_pt_set = np.array(gray_pt_set)
+
+    pixel = [gray_frame[pt[1], pt[0]] for pt in gray_pt_set]
+    d_pixel = abs(np.gradient(pixel))
+
+    refine_corners = []
+    for i in plist:
+        rough_coord = (x[i], y[i])
+        closest_index = find_closest_edge(gray_pt_set, rough_coord)
+        deriv_inspect = d_pixel[closest_index - win: closest_index + win]
+        norm_deriv = deriv_inspect * 255.0 / max(deriv_inspect)
+        # note that window out of range
+
+        peak_inspect = np.argmax(deriv_inspect)
+        refine_corner = gray_pt_set[closest_index - win + peak_inspect]
+        refine_corners.append(refine_corner)
+
+        k = 0
+        for j in range(closest_index-win, closest_index+win):
+            coord_x, coord_y = gray_pt_set[j]
+            color_frame[coord_y][coord_x] = (0, 0, norm_deriv[k])
+            k += 1
+
+        # color_frame[refine_corner[1]][refine_corner[0]] = (255, 0, 0)
+
+    ts = datetime.datetime.now()
+    filename = "../All_images/record/edge_refine{}.jpg".format(ts.strftime("%M-%S"))
+    cv2.imwrite(filename, color_frame)
+    # cv2.imshow('Window', color_frame)
+    # cv2.waitKey(0)
+
+    return refine_corners
+
+
+def edge_refinement_linear(gray_frame, x, y, plist):
+    win = 5
+
+    m, b = np.polyfit(x, y, 1)
+    end_pts = line_end_points_on_image(m, b, gray_frame.shape, True)
+    gray_pt_set = list(bresenham(end_pts[0][0], end_pts[0][1], end_pts[1][0], end_pts[1][1]))
+    gray_pt_set = np.array(gray_pt_set)
+
+    pixel = [gray_frame[pt[1], pt[0]] for pt in gray_pt_set]
+    d_pixel = abs(np.gradient(pixel))
+
+    coord_3D_rf = []
+    coord_2D_rf = []
+
+    for i in plist:
+        rough_coord = (x[i], y[i])
+        closest_index = find_closest_edge(gray_pt_set, rough_coord)
+        deriv_inspect = d_pixel[closest_index - win: closest_index + win]
+
+        peak_inspect = np.argmax(deriv_inspect)
+        refine_corner = gray_pt_set[closest_index - win + peak_inspect]
+        pt_rf = np.array([refine_corner[0], refine_corner[1], 0], dtype='float64')
+        coord_3D_rf.append(pt_rf)
+        coord_2D_rf.append(refine_corner)
+
+    return coord_3D_rf, coord_2D_rf
+
+def edge_refinement_conv(gray_frame, x, y, kernel):
 
     region_size = 6
     h, w = gray_frame.shape
@@ -182,8 +283,6 @@ def kernel_choice(m, i, dx, dy):
 
     return kernel
 
-
-
-
 if __name__ == "__main__":
-    detect()
+    # detect()
+    detect_linear()

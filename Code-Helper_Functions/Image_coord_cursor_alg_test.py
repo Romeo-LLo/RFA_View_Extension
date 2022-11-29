@@ -5,14 +5,14 @@ import sys
 
 from needle_utils_temp import *
 from Linear_equation_temp import *
-# function to display the coordinates of
-# of the points clicked on the image
+
+
+plist = [1, 4, 8]
 
 num_pt = 3
-# coordinates = np.zeros((num_pt, 3), dtype='float64')
-coordinates = np.array([[708, 818, 0],
-                        [658, 612, 0],
-                        [598, 385, 0]], dtype='float64')
+coordinates = np.array([[690.56, 855.25, 0],
+                        [608.96, 649.23, 0],
+                        [512.65, 412.45, 0]], dtype='float64')
 index = 0
 
 def click_event(event, x, y, flags, params):
@@ -24,7 +24,7 @@ def click_event(event, x, y, flags, params):
             coordinates_ready = coordinates.copy()
             print(coordinates_ready)
 
-            scale_estimation_multi(coordinates_ready[0], coordinates_ready[1], coordinates_ready[2], 50, 60, mtx, 2.2)
+            scale_estimation_multi(coordinates_ready[0], coordinates_ready[1], coordinates_ready[2], 48.262, 57.915, mtx, 2.2)
         if y > button2[0] and y < button2[1] and x > button2[2] and x < button2[3]:
             print("current index", index)
             if index >= num_pt - 1:
@@ -57,7 +57,7 @@ def click_event(event, x, y, flags, params):
                 x = int(coordinates_fit[i][0])
                 y = int(coordinates_fit[i][1])
                 cv2.putText(combine_img, str(index), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1, cv2.LINE_AA)
-                cv2.circle(combine_img, (x, y), 2, (255, 0, 0), -1)
+                cv2.circle(combine_img, (x, y), 1, (255, 0, 0), -1)
 
             print('Compare')
             print('Without fit')
@@ -74,8 +74,8 @@ def click_event(event, x, y, flags, params):
         else:
             coordinates[index] = np.array([x, y, 0], dtype='float64')
             print("index {}, x = {}, y = {}".format(index, x, y))
-            cv2.putText(combine_img, str(index), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 1, cv2.LINE_AA)
-            cv2.circle(combine_img, (x, y), 2, (0, 0, 255), -1)
+            cv2.putText(combine_img, str(plist[index]), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 1, cv2.LINE_AA)
+            cv2.circle(combine_img, (x, y), 1, (0, 0, 255), -1)
             index += 1
 
         cv2.imshow('image', combine_img)
@@ -84,8 +84,7 @@ def click_event(event, x, y, flags, params):
 # driver function
 if __name__ == "__main__":
 
-    # y 768 x 1024
-    img = cv2.imread('../All_images/error_investigate/39-43-2.40.jpg')
+    img = cv2.imread('../All_images/edge_investigate/Refine_linear/12-29-3.91.jpg')
 
     mtx, dist = camera_para_retrieve()
     # diamondCorners, rvec, tvec = diamond_detection(img, mtx, dist)

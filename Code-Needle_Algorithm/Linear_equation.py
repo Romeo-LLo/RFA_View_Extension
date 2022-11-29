@@ -77,15 +77,16 @@ def scale_estimation(q1, q2, q3, d1, d2, mtx):
 
     return tip, end
 
-def scale_estimation_multi(q1, q2, q3, d1, d2, mtx, tip_offset):
+def scale_estimation_multi_mod(q1, q2, q3, d1, d2, mtx, tip_offset):
 
-    f = 8
-    scale = mtx[0][0]
-    x_scale = f / scale
-    y_scale = f / scale
 
-    scale = np.array([x_scale, y_scale, 0])
+
+    # unit: mm
+    pixel_size = 3.45 * 0.001
+    f = mtx[0][0] * pixel_size
+    scale = np.array([pixel_size, pixel_size, 0])
     trans = np.array([mtx[0][2], mtx[1][2], 0])
+
 
     q1 -= trans
     q2 -= trans
@@ -94,7 +95,6 @@ def scale_estimation_multi(q1, q2, q3, d1, d2, mtx, tip_offset):
     q1 *= scale
     q2 *= scale
     q3 *= scale
-
 
     F = np.array([0, 0, f])
 
@@ -131,6 +131,73 @@ def scale_estimation_multi(q1, q2, q3, d1, d2, mtx, tip_offset):
     c2 = v2 * s1
     c3 = v3 * s1
 
+    p1 = 0.1 * (v1 * s1 - F) * np.array([-1, -1, 1])
+    p2 = 0.1 * (v2 * s2 - F) * np.array([-1, -1, 1])
+    p3 = 0.1 * (v3 * s3 - F) * np.array([-1, -1, 1])
+
+    # print('pts: ', p1, p2, p3)
+
+    unit = (p2 - p1) / np.linalg.norm((p2 - p1), axis=0)
+    tip = p1 - unit * tip_offset
+    end = p1 + unit * (30 - tip_offset)
+
+
+
+    return tip, end
+
+
+def scale_estimation_multi(q1, q2, q3, d1, d2, mtx, tip_offset):
+
+    f = 8
+    scale = mtx[0][0]
+    x_scale = f / scale
+    y_scale = f / scale
+    scale = np.array([x_scale, y_scale, 0])
+    trans = np.array([mtx[0][2], mtx[1][2], 0])
+
+    q1 -= trans
+    q2 -= trans
+    q3 -= trans
+
+    q1 *= scale
+    q2 *= scale
+    q3 *= scale
+
+    F = np.array([0, 0, f])
+
+    v1 = (F - q1) / np.linalg.norm((F - q1), axis=0)
+    v2 = (F - q2) / np.linalg.norm((F - q2), axis=0)
+    v3 = (F - q3) / np.linalg.norm((F - q3), axis=0)
+
+    A = v1
+    n = np.cross(v1, v2) / np.linalg.norm(np.cross(v1, v2), axis=0)
+    B = np.cross(n, A)
+
+    a1 = np.dot(v1, A)
+    a2 = np.dot(v2, A)
+    a3 = np.dot(v3, A)
+
+    b1 = np.dot(v1, B)
+    b2 = np.dot(v2, B)
+    b3 = np.dot(v3, B)
+
+    S = np.array([[d2 * a1, -d1 * a2 - d2 * a2, d1 * a3], [d2 * b1, -d1 * b2 - d2 * b2, d1 * b3]])
+    ns = null_space(S)
+
+    # check
+
+    d1p = np.linalg.norm(ns[0] * v1 - ns[1] * v2, axis=0)
+    d2p = np.linalg.norm(ns[1] * v2 - ns[2] * v3, axis=0)
+    scale_1 = d1 / d1p
+    scale_2 = d2 / d2p
+    s1 = ns[0] * scale_1
+    s2 = ns[1] * scale_1
+    s3 = ns[2] * scale_1
+
+    c1 = v1 * s1
+    c2 = v2 * s1
+    c3 = v3 * s1
+
     p1 = 0.1 * (F + v1 * s1) * np.array([-1, -1, 1])
     p2 = 0.1 * (F + v2 * s2) * np.array([-1, -1, 1])
     p3 = 0.1 * (F + v3 * s3) * np.array([-1, -1, 1])
@@ -141,10 +208,7 @@ def scale_estimation_multi(q1, q2, q3, d1, d2, mtx, tip_offset):
     tip = p1 - unit * tip_offset
     end = p1 + unit * (21.2 - tip_offset)
 
-
-
     return tip, end
-
 
 
 def scale_estimation_4p(q1, q2, q3, q4, d1, d2, d3, mtx, tip_offset):

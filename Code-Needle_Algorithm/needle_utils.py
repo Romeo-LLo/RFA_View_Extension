@@ -209,6 +209,10 @@ def find_closest_index(gray_pt_set, pt_set, peak):
     dist = np.sum((gray_pt_set - rough_coord)**2, axis=1)
     return np.argmin(dist)
 
+def find_closest_edge(gray_pt_set, rough_coord):
+    dist = np.sum((gray_pt_set - rough_coord)**2, axis=1)
+    return np.argmin(dist)
+
 def rough_edge(pt_set, pos_target, neg_target, color_img):
 
     for index in pos_target:
@@ -413,7 +417,6 @@ def corner_refinement(src_gray, corners):
 def line_polyfit(x, y):
 
     (m, b), res = np.polyfit(x, y, 1, full=True)[:2]
-    # print('res', res)
 
 
     # fit_kp = np.zeros((1, x.shape[0], 2))
@@ -505,6 +508,9 @@ def isMonotonic(A):
             all(A[i] >= A[i + 1] for i in range(len(A) - 1)))
 
 
+def isDistinct(x, y):
+    thres = 20
+    return all(math.sqrt((x[i] - x[i+1])**2 + (y[i] - y[i+1])**2) > thres for i in range(len(x) - 1))
 
 def error_calc(tip_t, end_t, tip, end):
 
@@ -512,7 +518,7 @@ def error_calc(tip_t, end_t, tip, end):
     uv = (tip - end) / np.linalg.norm(tip - end)
 
     angle_error = math.degrees(np.arccos(np.clip(np.dot(uv_t, uv), -1.0, 1.0)))
-    dist_error = np.linalg.norm(tip_t - tip)
+    dist_error = np.linalg.norm(end_t - end)
 
     # print(abs(tip_t - tip))
     # print(angle_error, dist_error)
@@ -523,7 +529,7 @@ def board_offset(rvec, tvec):
     r_matrix, _ = cv2.Rodrigues(rvec)
 
     board_len = 4.5
-    offsets = np.array([[0, 0, 0], [1*board_len, 0, 0], [3*board_len, 0, 0], [4*board_len, board_len, 0], [5*board_len, board_len, 0]])
+    offsets = np.array([[1*board_len, 0, 0], [2*board_len, 0, 0], [3*board_len, 0, 0], [4*board_len, board_len, 0], [5*board_len, board_len, 0]])
 
     coord3D = np.zeros((5, 3))
     for i, offset in enumerate(offsets):
@@ -552,28 +558,22 @@ def error_vec_calc_board(tip, anchor):
     return err_vec
 
 def pose_trans_needle(tvec, rvec):
-    # # origial = 21.2
-    # r_matrix, _ = cv2.Rodrigues(rvec[0][0])
-    # offset = np.array([1.07243335, 20.38937994, 2.73006118])
-    # # offset = np.array([0, 21.2, 2.5])
-    # tip_trans = np.matmul(offset, -r_matrix.T)
-    #
-    # tip = tvec[0][0] + tip_trans.T
-    #
-    # end_trans = np.matmul(np.array([0, 0, 2.5]), -r_matrix.T)
-    # end = tvec[0][0] + end_trans.T
-
 
     r_matrix, _ = cv2.Rodrigues(rvec[0][0])
-    # offset = np.array([0, -20.8, -2.5])
-    # offset = np.array([-0.0484527, - 20.0817824, - 2.91639071])
-    offset = np.array([-0.2010633, - 20.75761236, - 3.84062503])
-    # tip_trans = np.matmul(r_matrix, offset)
-    tip_trans = np.matmul(offset, r_matrix.T)
+
+    # offset = np.array([-0.2010633, - 20.75761236, - 3.84062503])
+
+    # the DIY needle offset
+    offset_tip = np.array([0.40552154, -19.98081186, -1.79185602])
+    offset_end = np.array([-0.21233228,  9.79359527, - 2.37879376])
+
+    tip_trans = np.matmul(offset_tip, r_matrix.T)
 
     tip = tvec[0][0] + tip_trans.T
 
-    end_trans = np.matmul(np.array([0, 0, -2.5]), r_matrix.T)
+    end_trans = np.matmul(offset_end, r_matrix.T)
     end = tvec[0][0] + end_trans.T
 
     return tip, end
+
+

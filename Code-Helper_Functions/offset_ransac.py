@@ -123,7 +123,7 @@ def offset_ransac_concat():
 
 
 
-def offset_ransac_3D_known():
+def offset_ransac_3D_known_grid():
 
     # [ -0.19394971 -20.76504864  -3.83135322]
     mtx, dist = camera_para_retrieve()
@@ -131,7 +131,7 @@ def offset_ransac_3D_known():
     squareLength = 1.3
     markerLength = 0.9
     arucoParams = aruco.DetectorParameters_create()
-    imgs = glob.glob(os.path.join("../All_images/offset3", "*.jpg"))
+    imgs = glob.glob(os.path.join("../All_images/offset_end1129", "*.jpg"))
 
     r1 = np.array([]).reshape(0, 3)
     t1 = np.array([])
@@ -173,4 +173,4 @@ def offset_ransac_3D_known():
 
 if __name__ == "__main__":
     # offset_ransac_concat()
-    offset_ransac_3D_known()
+    offset_ransac_3D_known_grid()
