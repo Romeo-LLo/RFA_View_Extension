@@ -37,6 +37,13 @@ cfg.MODEL.ROI_KEYPOINT_HEAD.NUM_KEYPOINTS = 12
 cfg.TEST.KEYPOINT_OKS_SIGMAS = np.ones((12, 1), dtype=float).tolist()
 predictor = DefaultPredictor(cfg)
 
+lazer = 1.036
+plist = [1, 3, 6]
+dlist = [40, 50]
+dlist = [d / lazer for d in dlist]
+tip_off = 2.25
+
+
 def detect():
     path = '../All_images/edge_investigate/Nolables'
     images = glob.glob('../All_images/edge_investigate/Nolables/*.jpg')
@@ -74,13 +81,13 @@ def detect():
 
 
 def detect_linear():
-    images = glob.glob('../All_images/edge_investigate/Blank/*.jpg')
+    mtx, dist = camera_para_retrieve()
+
+    images = glob.glob('../All_images/error_investigate/different_keypoint_blank/*.jpg')
 
     for img in images:
         frame = cv2.imread(img)
-
         # frame = cv2.imread('../All_images/edge_investigate/Blank/50-13-11.78.jpg')
-        plist = [1, 4, 8]
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         outputs = predictor(frame)
         kp_tensor = outputs["instances"].pred_keypoints
@@ -89,18 +96,27 @@ def detect_linear():
             kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
             x = kp[0, :-1, 0]
             y = kp[0, :-1, 1]
+            m, b = line_polyfit(x, y)
 
-            # m, b = line_polyfit(x, y)
-            # p1 = (0, round(b))
-            # p2 = (1000, round(m * 1000 + b))
-            # cv2.line(frame, p1, p2, (0, 0, 255), 1, cv2.LINE_AA)
-            #
-            # for i in range(1, 11):
-            #     cv2.circle(frame, (round(kp[0][i][0]), round(kp[0][i][1])), 1, (0, 255, 0), -1)
+            coord_3D_rf, coord_2D_rf = edge_refinement_linear_display(frame, gray_frame, x, y, plist)
 
-            refine_corners = edge_refinement_linear_display(frame, gray_frame, x, y, plist)
-            for corner in refine_corners:
-                cv2.circle(frame, (round(corner[0]), round(corner[1])), 1, (255, 0, 0), -1)
+            for i in range(3):
+                string = f"{coord_2D_rf[i][0]}, {coord_2D_rf[i][1]}"
+                cv2.putText(frame, string, (1000, 130 + 30 * i), cv2.FONT_HERSHEY_SIMPLEX,
+                            1, (0, 0, 255), 1, cv2.LINE_AA)
+            tip_rf, end_rf = scale_estimation_multi_mod(coord_3D_rf[0], coord_3D_rf[1], coord_3D_rf[2], dlist[0],
+                                                        dlist[1], mtx, tip_off)
+
+            error_rf = error_calc_board(tip_rf, anchor=0)
+            error_rf = round(error_rf, 2)
+
+            cv2.putText(frame, str(img), (300, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 1, cv2.LINE_AA)
+            cv2.putText(frame, f"{m:.2f}, {b:.2f}", (1000, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1,
+                        cv2.LINE_AA)
+
+            cv2.putText(frame, str(error_rf), (coord_2D_rf[2][0], coord_2D_rf[2][1]), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 1, cv2.LINE_AA)
+            for corner in coord_2D_rf:
+                frame[corner[1]][corner[0]] = (0, 0, 255)
 
             cv2.imshow('Window', frame)
             cv2.waitKey(0)
@@ -117,7 +133,8 @@ def edge_refinement_linear_display(color_frame, gray_frame, x, y, plist):
     pixel = [gray_frame[pt[1], pt[0]] for pt in gray_pt_set]
     d_pixel = abs(np.gradient(pixel))
 
-    refine_corners = []
+    coord_3D_rf = []
+    coord_2D_rf = []
     for i in plist:
         rough_coord = (x[i], y[i])
         closest_index = find_closest_edge(gray_pt_set, rough_coord)
@@ -127,23 +144,18 @@ def edge_refinement_linear_display(color_frame, gray_frame, x, y, plist):
 
         peak_inspect = np.argmax(deriv_inspect)
         refine_corner = gray_pt_set[closest_index - win + peak_inspect]
-        refine_corners.append(refine_corner)
+        pt_rf = np.array([refine_corner[0], refine_corner[1], 0], dtype='float64')
+        coord_3D_rf.append(pt_rf)
+        coord_2D_rf.append(refine_corner)
+
 
         k = 0
         for j in range(closest_index-win, closest_index+win):
             coord_x, coord_y = gray_pt_set[j]
-            color_frame[coord_y][coord_x] = (0, 0, norm_deriv[k])
+            color_frame[coord_y][coord_x] = (0, norm_deriv[k], 0)
             k += 1
 
-        # color_frame[refine_corner[1]][refine_corner[0]] = (255, 0, 0)
-
-    ts = datetime.datetime.now()
-    filename = "../All_images/record/edge_refine{}.jpg".format(ts.strftime("%M-%S"))
-    cv2.imwrite(filename, color_frame)
-    # cv2.imshow('Window', color_frame)
-    # cv2.waitKey(0)
-
-    return refine_corners
+    return coord_3D_rf, coord_2D_rf
 
 
 def edge_refinement_linear(gray_frame, x, y, plist):

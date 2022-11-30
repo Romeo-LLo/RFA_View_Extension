@@ -518,7 +518,7 @@ def error_calc(tip_t, end_t, tip, end):
     uv = (tip - end) / np.linalg.norm(tip - end)
 
     angle_error = math.degrees(np.arccos(np.clip(np.dot(uv_t, uv), -1.0, 1.0)))
-    dist_error = np.linalg.norm(end_t - end)
+    dist_error = np.linalg.norm(tip_t - tip)
 
     # print(abs(tip_t - tip))
     # print(angle_error, dist_error)

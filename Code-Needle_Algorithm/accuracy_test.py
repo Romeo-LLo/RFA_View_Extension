@@ -14,6 +14,7 @@ import torch
 import gi
 import cv2.aruco as aruco
 import datetime
+import time
 
 gi.require_version("Gst", "1.0")
 cfg = get_cfg()
@@ -30,12 +31,12 @@ predictor = DefaultPredictor(cfg)
 plists = [[2, 4, 7], [1, 4, 8]]
 dlists = [[38, 48], [48, 57.5]]
 tip_offset = [3.2, 2.25]
-# plist = [1, 4, 8]
-# dlist = [48.262, 57.915]
-# tip_off = 2.2
-plist = [2, 4, 8]
-dlist = [40, 60]
-tip_off = 3.2
+plist = [1, 4, 8]
+dlist = [48.262, 57.915]
+tip_off = 2.2
+# plist = [2, 4, 8]
+# dlist = [40, 60]
+# tip_off = 3.2
 
 
 def arucoboard_test():
@@ -139,9 +140,9 @@ def realtime_error_snapshot():
                     #     cv2.circle(frame, (round(kp[0][i][0]), round(kp[0][i][1])), 1, (0, 255, 0), -1)
                     #     cv2.putText(frame, str(i), (round(kp[0][i][0]), round(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX,
                     #                 1.5, (0, 0, 255), 1, cv2.LINE_AA)
-                    m, b = line_polyfit(x, y)
-                    p1 = (0, round(b))
-                    p2 = (1000, round(m * 1000 + b))
+                    # m, b = line_polyfit(x, y)
+                    # p1 = (0, round(b))
+                    # p2 = (1000, round(m * 1000 + b))
 
                     # cv2.line(frame, p1, p2, (0, 0, 255), 1, cv2.LINE_AA)
 
@@ -159,7 +160,7 @@ def realtime_error_snapshot():
 
                     if est_state:
 
-                        outputPath = '../All_images/edge_investigate/Blank'
+                        outputPath = '../All_images/error_investigate/Blank'
                         ts = datetime.datetime.now()
                         filename = "{}-{:.2f}.jpg".format(ts.strftime("%M-%S"), error)
                         path = os.path.sep.join((outputPath, filename))
@@ -195,92 +196,111 @@ def realtime_error_snapshot():
     cv2.destroyAllWindows()
 
 
-def realtime_error_board_refinement():
+def realtime_refinement_visual():
+
+    plt.ion()
+    fig = plt.figure()
+    ax = fig.add_subplot(121, projection='3d')
+    ax2 = fig.add_subplot(122)
+
+    us_img = plt.imread('../All_images/ultrasound_show.png')
+    # ax2.imshow(us_img)
+
+    num_lines = 2
+    num_steps = 2
+
+    color = ['red', 'green']
+    lines = [ax.plot([], [], [], color[i])[0] for i in range(num_lines)]
+    lines2 = [ax2.plot([], [], color[i])[0] for i in range(num_lines)]
+
+    sq_len = 15
+    deep = 70
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_xlim(-sq_len, sq_len)
+    ax.set_ylim(40, deep)
+    ax.set_zlim(-sq_len, sq_len)
+
+    sq_len = 30
+    ax2.set_xlabel('X')
+    ax2.set_ylabel('Y')
+    ax2.set_xlim(-sq_len, sq_len)
+    ax2.set_ylim(-sq_len, sq_len)
+
+    smooth = True
+    sm_factor = 0.8
+
     mtx, dist = camera_para_retrieve()
     Tis = TIS.TIS()
     Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
     Tis.Start_pipeline()
 
-    e_list = [0] * 2
-    eListcur = [0] * 2
-
     anchor = 1
-    count = 0
-    est_state = False
+    first = True
 
     while True:
         if Tis.Snap_image(1) is True:
+            trajs = np.zeros((num_lines, num_steps, 3))
+            trajs2 = np.zeros((num_lines, num_steps, 2))
+
             frame = Tis.Get_image()
             frame = frame[:, :, :3]
             dis_frame = np.array(frame)
             frame = undistort_img(dis_frame, mtx, dist)
             gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
+            diamondCorners, rvec, tvec = diamond_detection(dis_frame, mtx, dist)
+            if diamondCorners:
+                tip_a, end_a = pose_trans_needle(tvec, rvec)
+                trajs[0] = np.array([tip_a, end_a])
+                trajs2[0] = np.array([tip_a[:2], end_a[:2]])
+
             outputs = predictor(frame)
             kp_tensor = outputs["instances"].pred_keypoints
+
             if kp_tensor.size(dim=0) != 0 or not torch.isnan(kp_tensor).all():
 
                 kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
                 x = kp[0, :-1, 0]
                 y = kp[0, :-1, 1]
 
-
-
                 if isMonotonic(x) and isMonotonic(y) and isDistinct(x, y):
-                    # for i in range(11):
-                    #     cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 1, (0, 255, 0), -1)
-                    #     cv2.puText(frame, str(i), (round(kp[0][i][0]), round(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1,
-                    #                 (0, 255, 0), 1, cv2.LINE_AA)
 
-                    # m, b = line_polyfit(x, y)
-                    # p1 = (0, round(b))
-                    # p2 = (1000, round(m * 1000 + b))
-                    # cv2.line(frame, p1, p2, (0, 0, 255), 1, cv2.LINE_AA)
+                    m, b = line_polyfit(x, y)
+                    p1 = (0, round(b))
+                    p2 = (1000, round(m * 1000 + b))
+                    cv2.line(frame, p1, p2, (0, 0, 255), 1, cv2.LINE_AA)
 
-                    coord_3D = []
-                    coord_3D_rf, coord_2D_rf = edge_refinement_linear(gray_frame, x, y, plist)
+                    coord_3D_rf, _ = edge_refinement_linear(gray_frame, x, y, plist)
 
-                    for i in plist:
-                        pt = np.array([kp[0][i][0], kp[0][i][1], 0], dtype='float64')
-                        coord_3D.append(pt)
-
-                    tip, end = scale_estimation_multi_mod(coord_3D[0], coord_3D[1], coord_3D[2], dlist[0], dlist[1],
-                                                      mtx, tip_off)
                     tip_rf, end_rf = scale_estimation_multi_mod(coord_3D_rf[0], coord_3D_rf[1], coord_3D_rf[2], dlist[0],
                                                       dlist[1], mtx, tip_off)
-                    error = error_calc_board(tip, anchor=anchor)
-                    error_rf = error_calc_board(tip_rf, anchor=anchor)
-                    error_vec = error_vec_calc_board(tip_rf, anchor=anchor)
+                    trajs[1] = np.array([tip_rf, end_rf])
+                    trajs2[1] = np.array([tip_rf[:2], end_rf[:2]])
 
-                    e_list[0] += error
-                    e_list[1] += error_rf
+                    # if first:
+                    #     trajs[1] = np.array([tip_rf, end_rf])
+                    #     first = False
+                    # else:
+                    #     sm_tip = trajs[1][0] * sm_factor + tip_rf * (1 - sm_factor)
+                    #     sm_end = trajs[1][1] * sm_factor + end_rf * (1 - sm_factor)
+                    #     trajs[1] = np.array([sm_tip, sm_end])
 
-                    eListcur[0] = round(error, 2)
-                    eListcur[1] = round(error_rf, 2)
-                    count += 1
-                    eList = [round(x / count, 2) for x in e_list]
-                    print(eListcur, eList, count)
-                    # print(eListcur, error_vec[2]/error_rf)
+                    if diamondCorners:
+                        angle_diff, dist_diff = error_calc(tip_a, end_a, tip_rf, end_rf)
+                        # print(round(angle_diff, 2), round(dist_diff, 2))
 
+            for line, traj in zip(lines, trajs):
+                line.set_data(traj[:, 0], traj[:, 2])
+                line.set_3d_properties(-traj[:, 1])
 
-                    if est_state:
-
-                        outputPath = '../All_images/edge_investigate/Refine_linear'
-                        ts = datetime.datetime.now()
-                        filename = "{}-{:.2f}.jpg".format(ts.strftime("%M-%S"), error)
-                        path = os.path.sep.join((outputPath, filename))
-                        cv2.putText(frame, str(round(error, 2)), (800, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 1, cv2.LINE_AA)
-                        cv2.putText(frame, str(round(error_rf, 2)), (800, 150), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
-                        vec = f"{error_vec[0]} {error_vec[1]} {error_vec[2]}"
-                        cv2.putText(frame, vec, (800, 180), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1, cv2.LINE_AA)
-                        for coord in coord_2D_rf:
-                            frame[coord[1]][coord[0]] = (0, 255, 0)
-
-                        cv2.imwrite(path, frame)
-                        print('Record')
-                        est_state = False
+            for line, traj in zip(lines2, trajs2):
+                line.set_data(-traj[:, 0], -traj[:, 1])
 
 
+        fig.canvas.draw()
+        fig.canvas.flush_events()
         frameS = cv2.resize(frame, (1080, 810))
         cv2.imshow('Window', frameS)
 
@@ -288,8 +308,7 @@ def realtime_error_board_refinement():
         if k == 13:
             anchor += 1
             print(f"Now point to hole {anchor}")
-        elif k == 27:
-            est_state = True
+
 
     Tis.Stop_pipeline()
     cv2.destroyAllWindows()
@@ -297,5 +316,5 @@ def realtime_error_board_refinement():
 
 if __name__ == "__main__":
     arucoboard_test()
-    # realtime_error_board_refinement()
+    # realtime_refinement_visual()
     # realtime_error_snapshot()
