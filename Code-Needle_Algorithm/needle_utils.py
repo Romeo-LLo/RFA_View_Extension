@@ -21,11 +21,11 @@ line_height_target = 80
 
 def camera_para_retrieve():
 
-    mtx1110 = np.load('../CameraParameter/AUX273_mtx1110.npy')
-    dist1110 = np.load('../CameraParameter/AUX273_dist1110.npy')
+    mtx = np.load('../CameraParameter/AUX273_mtx1202.npy')
+    dist = np.load('../CameraParameter/AUX273_dist1202.npy')
     # mtx2 = np.load('../CameraParameter/AUX273_mtx2.npy')
     # dist2 = np.load('../CameraParameter/AUX273_dist2.npy')
-    return mtx1110, dist1110
+    return mtx, dist
 
 
 def generate_mask(diamondCorners, img):
@@ -529,9 +529,18 @@ def board_offset(rvec, tvec):
     r_matrix, _ = cv2.Rodrigues(rvec)
 
     board_len = 4.5
-    offsets = np.array([[1*board_len, 0, 0], [2*board_len, 0, 0], [3*board_len, 0, 0], [4*board_len, board_len, 0], [5*board_len, board_len, 0]])
+    offsets = np.array([[1*board_len, 0, 0],
+                        [2*board_len, 0, 0],
+                        [3*board_len, 0, 0],
+                        [4*board_len, board_len, 0],
+                        [5*board_len, board_len, 0],
+                        [1*board_len, 3*board_len, 0],
+                        [2*board_len, 3*board_len, 0],
+                        [3*board_len, 3*board_len, 0],
+                        [4*board_len, 3*board_len, 0],
+                        [5*board_len, 3*board_len, 0]])
 
-    coord3D = np.zeros((5, 3))
+    coord3D = np.zeros((10, 3))
     for i, offset in enumerate(offsets):
         trans = np.matmul(offset, r_matrix.T)
         coord3D[i] = tvec.T + trans
@@ -547,6 +556,19 @@ def error_calc_board(tip, anchor):
 
     return error
 
+def error_angle_board(tip, end, anchor):
+
+    board_coordinate = np.load("../Coordinate/board_coordinate.npy")
+    tip_b = board_coordinate[0]
+    end_b = board_coordinate[5+anchor]
+
+    uv_t = (tip_b - end_b) / np.linalg.norm(tip_b - end_b)
+    uv = (tip - end) / np.linalg.norm(tip - end)
+
+    angle_error = math.degrees(np.arccos(np.clip(np.dot(uv_t, uv), -1.0, 1.0)))
+
+    return angle_error
+
 
 def error_vec_calc_board(tip, anchor):
 
@@ -561,11 +583,16 @@ def pose_trans_needle(tvec, rvec):
 
     r_matrix, _ = cv2.Rodrigues(rvec[0][0])
 
-    # offset = np.array([-0.2010633, - 20.75761236, - 3.84062503])
+    # offset_tip = np.array([ -0.62134536, -20.31548482  -2.80522987])
+
+    # 12 / 7 original tool
+    # offset_tip = [-0.69156388, -20.42863786, -3.59820354]
+    # offset_end = [0, 0, -2.5]
 
     # the DIY needle offset
-    offset_tip = np.array([0.40552154, -19.98081186, -1.79185602])
-    offset_end = np.array([-0.21233228,  9.79359527, - 2.37879376])
+    offset_tip = np.array([0.38586773, -19.75394137, -2.30275252])
+    offset_end = np.array([-0.2734269, 9.92622178, -1.63618984])
+
 
     tip_trans = np.matmul(offset_tip, r_matrix.T)
 

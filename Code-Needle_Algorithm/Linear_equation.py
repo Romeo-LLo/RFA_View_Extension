@@ -123,17 +123,14 @@ def scale_estimation_multi_mod(q1, q2, q3, d1, d2, mtx, tip_offset):
     d2p = np.linalg.norm(ns[1] * v2 - ns[2] * v3, axis=0)
     scale_1 = d1 / d1p
     scale_2 = d2 / d2p
-    s1 = ns[0] * scale_1
-    s2 = ns[1] * scale_1
-    s3 = ns[2] * scale_1
+    s1 = ns[0] * scale_2
+    s2 = ns[1] * scale_2
+    s3 = ns[2] * scale_2
 
-    c1 = v1 * s1
-    c2 = v2 * s1
-    c3 = v3 * s1
 
-    p1 = 0.1 * (v1 * s1 - F) * np.array([-1, -1, 1])
-    p2 = 0.1 * (v2 * s2 - F) * np.array([-1, -1, 1])
-    p3 = 0.1 * (v3 * s3 - F) * np.array([-1, -1, 1])
+    p1 = 0.1 * (v1 * s1 - 2*F) * np.array([-1, -1, 1])
+    p2 = 0.1 * (v2 * s2 - 2*F) * np.array([-1, -1, 1])
+    p3 = 0.1 * (v3 * s3 - 2*F) * np.array([-1, -1, 1])
 
     # print('pts: ', p1, p2, p3)
 

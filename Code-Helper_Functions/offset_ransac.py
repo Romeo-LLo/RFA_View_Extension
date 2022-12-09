@@ -131,7 +131,51 @@ def offset_ransac_3D_known_grid():
     squareLength = 1.3
     markerLength = 0.9
     arucoParams = aruco.DetectorParameters_create()
-    imgs = glob.glob(os.path.join("../All_images/offset_end1129", "*.jpg"))
+    imgs = glob.glob(os.path.join("../All_images/offset_tip1129", "*.jpg"))
+
+    r1 = np.array([]).reshape(0, 3)
+    t1 = np.array([])
+    t2 = np.array([])
+
+
+    board_coordinate = np.load("../Coordinate/board_coordinate.npy")
+    fix_pt = board_coordinate[0]
+    fix_pt = fix_pt.T
+    for i in range(len(imgs)):
+    # for i in range(300):
+
+        sample1 = cv2.imread(imgs[i])
+        corners1, ids1, rejectedImgPoints = aruco.detectMarkers(sample1, aruco_dict, parameters=arucoParams)
+
+        if np.any(ids1 != None):
+            diamondCorners1, diamondIds1 = aruco.detectCharucoDiamond(sample1, corners1, ids1, squareLength / markerLength)
+
+            if diamondCorners1:  # if aruco marker detected
+                rvec1, tvec1, _ = aruco.estimatePoseSingleMarkers(diamondCorners1, squareLength, mtx, dist)
+
+                r_matrix1, _ = cv2.Rodrigues(rvec1[0][0])
+
+                r1 = np.vstack([r1, r_matrix1])
+                t1 = np.hstack([t1, tvec1[0][0]])
+                t2 = np.hstack([t2, fix_pt])
+
+
+    r = r1
+    t = t2 - t1
+    offset = np.linalg.lstsq(r, t, rcond=None)[0]
+
+    print(offset)
+
+
+def offset_ransac_3D_known_grid_original_tool():
+
+    # [ -0.19394971 -20.76504864  -3.83135322]
+    mtx, dist = camera_para_retrieve()
+    aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_50)
+    squareLength = 1.3
+    markerLength = 0.9
+    arucoParams = aruco.DetectorParameters_create()
+    imgs = glob.glob(os.path.join("../All_images/offset_original_tool", "*.jpg"))
 
     r1 = np.array([]).reshape(0, 3)
     t1 = np.array([])
@@ -142,7 +186,6 @@ def offset_ransac_3D_known_grid():
     fix_pt = board_coordinate[1]
     fix_pt = fix_pt.T
     for i in range(len(imgs)):
-    # for i in range(300):
 
         sample1 = cv2.imread(imgs[i])
         corners1, ids1, rejectedImgPoints = aruco.detectMarkers(sample1, aruco_dict, parameters=arucoParams)
@@ -171,6 +214,8 @@ def offset_ransac_3D_known_grid():
 
 
 
+
 if __name__ == "__main__":
     # offset_ransac_concat()
-    offset_ransac_3D_known_grid()
+    # offset_ransac_3D_known_grid()
+    offset_ransac_3D_known_grid_original_tool()
