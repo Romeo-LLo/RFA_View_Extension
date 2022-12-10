@@ -10,6 +10,9 @@ from needle_utils import *
 import torch
 from scipy import odr
 from edge_refinement import *
+from collections import deque
+from statistics import mean, stdev
+
 import sys
 sys.path.insert(0, '/home/user/Desktop/PycharmProjects/RFA_View_Extension/RFA_View_Extension/Code-Needle_Algorithm')
 
@@ -31,13 +34,18 @@ def bending_detect():
     Tis = TIS.TIS()
     Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
     Tis.Start_pipeline()
-    indicator = 0
+
+
+    loss_win = deque(maxlen=20)
+    std_win = deque(maxlen=20)
+
     while True:
         if Tis.Snap_image(1) is True:
             frame = Tis.Get_image()
             frame = frame[:, :, :3]
             dis_frame = np.array(frame)
             frame = undistort_img(dis_frame, mtx, dist)
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
             outputs = predictor(frame)
             kp_tensor = outputs["instances"].pred_keypoints
@@ -48,26 +56,40 @@ def bending_detect():
                 x = kp[0, :-1, 0]
                 y = kp[0, :-1, 1]
 
+                odr_end_pt = 10
+                for i in range(1, odr_end_pt):
+                    cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 3, (0, 0, 255), -1)
 
-                if isMonotonic(x) and isMonotonic(y):
-                    for i in range(11):
-                        cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 2, (0, 255, 0), -1)
-                        cv2.putText(frame, str(i), (int(kp[0][i][0]), int(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
-                                    (0, 0, 255), 1, cv2.LINE_AA)
+                if isMonotonic(x) and isMonotonic(y) and isDistinct(x, y):
+                    coord_3D_rf, coord_2D_rf = edge_refinement_linear_mod2(gray_frame, x, y, list(range(9)))
+                    interval = []
+                    for i in range(4, 8):
+                        dis = np.linalg.norm(coord_2D_rf[i] - coord_2D_rf[i - 1])
+                        interval.append(dis)
+                    interval[2] /= 3
+                    dis_std = np.std(interval)
 
-                    m_, b_ = np.polyfit(x, y, 1)
+                    std_win.append(dis_std)
 
+
+                    m, b = np.polyfit(x[1:odr_end_pt], y[1:odr_end_pt], 1)
                     odr_model = odr.Model(target_function)
-
-                    data = odr.Data(x, y)
-                    ordinal_distance_reg = odr.ODR(data, odr_model,
-                                                   beta0=[m_, b_])
+                    data = odr.Data(x[1:odr_end_pt], y[1:odr_end_pt])
+                    ordinal_distance_reg = odr.ODR(data, odr_model, beta0=[m, b])
                     out = ordinal_distance_reg.run()
-                    indicator = out.sum_square
+                    loss = out.sum_square
 
-                    cv2.putText(frame, str(indicator), (800, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
+                    loss_win.append(loss)
+                    print(f"{mean(std_win):.2f}, {mean(loss_win):.2f}")
 
-            cv2.putText(frame, str(indicator), (800, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
+
+                    # for i in range(1, len(coord_2D_rf)):
+                    #     coord = coord_2D_rf[i]
+                    #     cv2.circle(frame, (coord[0], coord[1]), 1, (0, 255, 0), -1)
+
+                    cv2.putText(frame, f'dist_std : {dis_std}', (800, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
+                    cv2.putText(frame, f'loss : {loss}', (800, 150), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
+
             cv2.imshow('Window', frame)
 
             if cv2.waitKey(1) == ord('q'):
@@ -105,10 +127,10 @@ def bending_mod():
                 cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 1, (0, 0, 255), -1)
 
             if isMonotonic(x) and isMonotonic(y) and isDistinct(x, y):
-                coord_3D_rf, coord_2D_rf = edge_refinement_linear_mod(gray_frame, x, y, list(range(1, 9)))
+                coord_3D_rf, coord_2D_rf = edge_refinement_linear_mod2(gray_frame, x, y, list(range(9)))
 
                 interval = []
-                for i in range(1, 8):
+                for i in range(2, 8):
                     dis = np.linalg.norm(coord_2D_rf[i] - coord_2D_rf[i-1])
                     interval.append(dis)
                 interval[1] /= 3
@@ -128,5 +150,5 @@ def bending_mod():
 
 
 if __name__ == "__main__":
-    # bending_detect()
-    bending_mod()
+    bending_detect()
+    # bending_mod()

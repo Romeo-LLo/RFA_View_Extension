@@ -121,11 +121,11 @@ def detect_linear():
 
 
 def detect_linear_img():
-    ng_set = ['45-11', '44-50', '45-17', '44-56']
-    # ng_set = ['15-56', '15-19', '14-39', '14-18', '14-51']
+    # ng_set = ['45-11', '44-50', '45-17', '44-56']
+    ng_set = ['15-56', '15-19', '14-39', '14-18', '14-51']
     for num in ng_set:
-        # frame = cv2.imread(f"../All_images/TrainImage/{num}.jpg")
-        frame = cv2.imread(f"../All_images/Testimg_undist/{num}.jpg")
+        frame = cv2.imread(f"../All_images/TrainImage/{num}.jpg")
+        # frame = cv2.imread(f"../All_images/Testimg_undist/{num}.jpg")
 
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         outputs = predictor(frame)
@@ -221,21 +221,27 @@ def edge_db_refinement_linear_display(color_frame, gray_frame, x, y, plist):
         norm_deriv = 255 * (deriv_inspect - np.min(deriv_inspect)) / (np.max(deriv_inspect) - np.min(deriv_inspect))
 
         kernel = kernel_choice(m, i, dx, dy)
+        top = 4
         if i % 2 == 0:
-            indice = np.argpartition(deriv_inspect, -3)[-3:]
-        else:
-            deriv_inspect = np.negative(deriv_inspect)
-            indice = np.argpartition(deriv_inspect, -3)[-3:]
+            indice = np.argpartition(deriv_inspect, -top)[-top:]
+            peak = np.argmax(deriv_inspect)
 
-        peak_inspect = 0
+        else:
+            peak = np.argmin(deriv_inspect)
+            deriv_inspect = np.negative(deriv_inspect)
+            indice = np.argpartition(deriv_inspect, -top)[-top:]
+
+        peak_inspect = peak
         max_prod = 0
         for idx in indice:
             pt = gray_pt_set[closest_index - win + idx + 1]
             region = cropArea(gray_frame, pt[0], pt[1])
             inner_product = (kernel * region).sum()
             if inner_product > max_prod:
-                print('got you!')
                 peak_inspect = idx
+                max_prod = inner_product
+        #         print(inner_product, idx)
+        # print(f'original: {peak}, refined: {peak_inspect}')
 
         refine_corner = gray_pt_set[closest_index - win + peak_inspect + 1]
         pt_rf = np.array([refine_corner[0], refine_corner[1], 0], dtype='float64')
@@ -251,17 +257,63 @@ def edge_db_refinement_linear_display(color_frame, gray_frame, x, y, plist):
 
     return coord_3D_rf, coord_2D_rf
 
-def end_pts_tip2end(x, y, shape):
-    m, b = np.polyfit(x, y, 1)
-    end_pts = line_end_points_on_image(m, b, shape, True)
 
-    # the distance between 2 possible end pts and index 0 edge
 
-    d1 = np.linalg.norm([x[0] - end_pts[0][0], y[0] - end_pts[0][1]])
-    d2 = np.linalg.norm([x[0] - end_pts[1][0], y[0] - end_pts[1][1]])
-    if d1 > d2:
-        end_pts[0], end_pts[1] = end_pts[1], end_pts[0]
-    return end_pts
+
+def edge_refinement_linear_mod2(gray_frame, x, y, plist):
+    win = 10
+
+    end_pts = end_pts_tip2end(x, y, gray_frame.shape)
+    gray_pt_set = list(bresenham(end_pts[0][0], end_pts[0][1], end_pts[1][0], end_pts[1][1]))
+    gray_pt_set = np.array(gray_pt_set)
+
+    pixel = [gray_frame[pt[1], pt[0]] for pt in gray_pt_set]
+    d_pixel = np.gradient(pixel)
+
+    m, b = line_polyfit(x, y)
+    dx = x[1] - x[4]
+    dy = y[1] - y[4]
+
+    coord_3D_rf = []
+    coord_2D_rf = []
+    for i in plist:
+        rough_coord = (x[i], y[i])
+        closest_index = find_closest_edge(gray_pt_set, rough_coord)
+        deriv_inspect_o = d_pixel[closest_index - win: closest_index + win]
+        deriv_inspect = deriv_inspect_o[1:-1]
+        # note that window out of range
+        kernel = kernel_choice(m, i, dx, dy)
+        top = 4
+        if i % 2 == 0:
+            # initial guess with highest deriv
+            peak = np.argmax(deriv_inspect)
+            indice = np.argpartition(deriv_inspect, -top)[-top:]
+
+        else:
+            peak = np.argmin(deriv_inspect)
+            deriv_inspect = np.negative(deriv_inspect)
+            indice = np.argpartition(deriv_inspect, -top)[-top:]
+
+        # further refine with conv
+        peak_inspect = peak
+        max_prod = 0
+        for idx in indice:
+            pt = gray_pt_set[closest_index - win + idx + 1]
+            region = cropArea(gray_frame, pt[0], pt[1])
+            inner_product = (kernel * region).sum()
+            if inner_product > max_prod:
+                peak_inspect = idx
+                max_prod = inner_product
+
+        refine_corner = gray_pt_set[closest_index - win + peak_inspect + 1]
+        pt_rf = np.array([refine_corner[0], refine_corner[1], 0], dtype='float64')
+        coord_3D_rf.append(pt_rf)
+        coord_2D_rf.append(refine_corner)
+
+
+
+    return coord_3D_rf, coord_2D_rf
+
 
 def edge_refinement_linear_mod(gray_frame, x, y, plist):
     win = 10
@@ -320,6 +372,20 @@ def edge_refinement_linear(gray_frame, x, y, plist):
         coord_2D_rf.append(refine_corner)
 
     return coord_3D_rf, coord_2D_rf
+
+
+def end_pts_tip2end(x, y, shape):
+    m, b = np.polyfit(x, y, 1)
+    end_pts = line_end_points_on_image(m, b, shape, True)
+
+    # the distance between 2 possible end pts and index 0 edge
+
+    d1 = np.linalg.norm([x[0] - end_pts[0][0], y[0] - end_pts[0][1]])
+    d2 = np.linalg.norm([x[0] - end_pts[1][0], y[0] - end_pts[1][1]])
+    if d1 > d2:
+        end_pts[0], end_pts[1] = end_pts[1], end_pts[0]
+    return end_pts
+
 
 def cropArea(gray_frame, x, y):
     region_size = 2
