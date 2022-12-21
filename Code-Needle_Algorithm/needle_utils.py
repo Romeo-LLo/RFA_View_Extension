@@ -528,7 +528,7 @@ def error_calc(tip_t, end_t, tip, end):
 def board_offset(rvec, tvec):
     r_matrix, _ = cv2.Rodrigues(rvec)
 
-    board_len = 4.5
+    board_len = 4
     offsets = np.array([[1*board_len, 0, 0],
                         [2*board_len, 0, 0],
                         [3*board_len, 0, 0],
@@ -585,8 +585,8 @@ def pose_trans_needle(tvec, rvec):
 
     # offset_tip = np.array([ -0.62134536, -20.31548482  -2.80522987])
 
-    # 12 / 7 original tool
-    # offset_tip = [-0.69156388, -20.42863786, -3.59820354]
+    # 12 / 11 original tool
+    # offset_tip = [-0.10867995, -20.48369757,  -3.75519427]
     # offset_end = [0, 0, -2.5]
 
     # the DIY needle offset

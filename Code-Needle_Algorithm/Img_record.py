@@ -29,11 +29,11 @@ def manual_record():
             frame = undistort_img(dis_frame, mtx, dist)
 
 
-            diamondCorners, rvec, tvec = diamond_detection(frame, mtx, dist)
+            # diamondCorners, rvec, tvec = diamond_detection(frame, mtx, dist)
 
-            if est_state and diamondCorners:
+            if est_state:
 
-                outputPath = '../All_images/offset_original_tool'
+                outputPath = '../All_images/TrainImg_plain'
                 ts = datetime.datetime.now()
                 filename = "{}.jpg".format(ts.strftime("%M-%S"))
                 path = os.path.sep.join((outputPath, filename))

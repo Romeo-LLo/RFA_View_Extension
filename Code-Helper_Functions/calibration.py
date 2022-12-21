@@ -182,8 +182,8 @@ def calibration():
     images = glob.glob('../All_images/calibration/*.jpg')
     allCorners, allIds, imsize = read_chessboards(images)
     ret, mtx, dist, rvecs, tvecs = calibrate_camera(allCorners,allIds,imsize)
-    np.save('../CameraParameter/AUX273_mtx1202.npy', mtx)
-    np.save('../CameraParameter/AUX273_dist1202.npy', dist)
+    # np.save('../CameraParameter/AUX273_mtx1202.npy', mtx)
+    # np.save('../CameraParameter/AUX273_dist1202.npy', dist)
 
 if __name__ == "__main__":
     calibration()

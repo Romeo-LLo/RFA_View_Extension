@@ -14,14 +14,17 @@ import torch
 import gi
 import cv2.aruco as aruco
 import datetime
+import time
 
+from collections import deque
+from statistics import mean, stdev
 gi.require_version("Gst", "1.0")
 cfg = get_cfg()
 
 cfg.MODEL.DEVICE = "cuda"
 cfg.merge_from_file(model_zoo.get_config_file("COCO-Keypoints/keypoint_rcnn_R_50_FPN_3x.yaml"))
 cfg.MODEL.WEIGHTS = '../Model_path/model_1201.pth'
-cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7   # set a custom testing threshold
+cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7   # set aq custom testing threshold
 cfg.TEST.DETECTIONS_PER_IMAGE = 1
 cfg.MODEL.ROI_KEYPOINT_HEAD.NUM_KEYPOINTS = 12
 cfg.TEST.KEYPOINT_OKS_SIGMAS = np.ones((12, 1), dtype=float).tolist()
@@ -51,16 +54,16 @@ def aruco_accuracy_record():
             if diamondCorners:
                 tip_a, end_a = pose_trans_needle(tvec, rvec)
                 # error_vec = error_vec_calc_board(tip_a, anchor)
-                error = error_calc_board(tip_a, anchor)
+                # error = error_calc_board(tip_a, anchor)
 
-                # error = error_angle_board(tip_a, end_a, anchor=anchor)
+                error = error_angle_board(tip_a, end_a, anchor=anchor)
+                # print(f'{error:.2f}')q
+                # if error < 1.5:
+                cv2.aruco.drawAxis(frame, mtx, dist, rvec, tvec, 1)
+                avg_error += error
+                frame_count += 1
 
-                if error < 1.5:
-                    cv2.aruco.drawAxis(frame, mtx, dist, rvec, tvec, 1)
-                    avg_error += error
-                    frame_count += 1
-
-                    print(round(error, 2), round(avg_error / frame_count, 2), frame_count)
+                print(round(error, 2), round(avg_error / frame_count, 2), frame_count)
 
 
         frameS = cv2.resize(frame, (1080, 810))
@@ -233,9 +236,10 @@ def multi_set_needle_refinement_accuracy_record():
 
                         for coord in coord_2D_rf:
                             cv2.circle(frame, (coord[0], coord[1]), 3, (0, 255, 0), -1)
-
-                        tip_rf, end_rf = scale_estimation_multi_mod(coord_3D_rf[0], coord_3D_rf[1], coord_3D_rf[2], ds[0],
-                                                          ds[1], mtx, tip_offset[i])
+                        plist = [2, 4, 8]
+                        dlist = [40, 60]
+                        tip_rf, end_rf = scale_estimation_multi_mod(coord_3D_rf[0], coord_3D_rf[1], coord_3D_rf[2], dlist[0],
+                                                          dlist[1], mtx, tip_offset[i])
                         avg_tip = np.append(avg_tip, np.array([tip_rf]), axis=0)
                         error_rf = error_calc_board(tip_rf, anchor=anchor)
                         # error_rf = error_angle_board(tip_rf, end_rf, anchor=anchor)
@@ -393,14 +397,14 @@ def model_keypoint_error():
                 ys = kp[0, :-1, 1]
 
                 ps = list(range(11))
-                coord_3D_rf, coord_2D_rf = edge_refinement_linear_mod(gray_frame, xs, ys, ps)
+                coord_3D_rf, coord_2D_rf = edge_refinement_linear_mod2(gray_frame, xs, ys, ps)
 
                 gt = test['annotations'][i]['keypoints']
                 for j, (x, y) in enumerate(zip(xs, ys)):
                     gtx = gt[3 * j]
                     gty = gt[3 * j + 1]
                     err = math.sqrt((gtx - x) ** 2 + (gty - y) ** 2)
-                    if err > 100 or j == 0 or j >= 9:
+                    if j == 0 or j >= 9:
                         continue
                     avg_err += err
 
@@ -410,22 +414,163 @@ def model_keypoint_error():
                     avg_rf_err += err_rf
 
                     count += 1
-
-                    if err_rf > 3:
-                        cv2.circle(frame, (round(gtx), round(gty)), 1, (0, 255, 0), -1)
-                        cv2.circle(frame, (round(x), round(y)), 1, (255, 0, 0), -1)
-                        cv2.circle(frame, (round(rfx), round(rfy)), 1, (0, 0, 255), -1)
-                        print(err, err_rf)
+                    cv2.circle(frame, (round(gtx), round(gty)), 1, (0, 255, 0), -1)
+                    cv2.circle(frame, (round(x), round(y)), 1, (255, 0, 0), -1)
+                    cv2.circle(frame, (round(rfx), round(rfy)), 1, (0, 0, 255), -1)
+                    print(err, err_rf)
+                    # if err_rf > 3:
+                    #     cv2.circle(frame, (round(gtx), round(gty)), 1, (0, 255, 0), -1)
+                    #     cv2.circle(frame, (round(x), round(y)), 1, (255, 0, 0), -1)
+                    #     cv2.circle(frame, (round(rfx), round(rfy)), 1, (0, 0, 255), -1)
+                    #     print(err, err_rf)
 
             cv2.imshow('point', frame)
             cv2.waitKey()
 
+
     print(avg_err / count, count)
     print(avg_rf_err / count, count)
+
+
+
+def FPS_test():
+    mtx, dist = camera_para_retrieve()
+    Tis = TIS.TIS()
+    Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
+    Tis.Start_pipeline()
+
+    while True:
+        if Tis.Snap_image(1) is True:
+            start = time.time()
+            frame = Tis.Get_image()
+            frame = frame[:, :, :3]
+            dis_frame = np.array(frame)
+            frame = undistort_img(dis_frame, mtx, dist)
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            outputs = predictor(frame)
+            kp_tensor = outputs["instances"].pred_keypoints
+            if kp_tensor.size(dim=0) != 0 and not torch.isnan(kp_tensor).any():
+
+
+                kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+                x = kp[0, :-1, 0]
+                y = kp[0, :-1, 1]
+
+                ps = [2, 4, 8]
+                ds = [40 / lazer, 60 / lazer]
+                tip_offset = 3.2
+                if isMonotonic(x) and isMonotonic(y) and isDistinct(x, y):
+                    coord_3D_rf, coord_2D_rf = edge_refinement_linear_mod2(gray_frame, x, y, ps)
+
+                    tip_rf, end_rf = scale_estimation_multi_mod(coord_3D_rf[0], coord_3D_rf[1], coord_3D_rf[2], ds[0],
+                                                        ds[1], mtx, tip_offset)
+            end = time.time()
+            cv2.imshow('Window', frame)
+
+            if cv2.waitKey(1) == ord('q'):
+                break
+    Tis.Stop_pipeline()
+    cv2.destroyAllWindows()
+
+
+
+def bending_odr_std():
+    Tis = TIS.TIS()
+    Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
+    Tis.Start_pipeline()
+    mtx, dist = camera_para_retrieve()
+
+    length = 30
+    loss_win = deque(maxlen=length)
+    std_win = deque(maxlen=length)
+
+    while True:
+        if Tis.Snap_image(1) is True:
+            frame = Tis.Get_image()
+            frame = frame[:, :, :3]
+            dis_frame = np.array(frame)
+            frame = undistort_img(dis_frame, mtx, dist)
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            outputs = predictor(frame)
+            kp_tensor = outputs["instances"].pred_keypoints
+            if kp_tensor.size(dim=0) != 0 and not torch.isnan(kp_tensor).any():
+                kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+                x = kp[0, :-1, 0]
+                y = kp[0, :-1, 1]
+
+                m, b = line_polyfit(x, y)
+                dx = x[1] - x[4]
+                dy = y[1] - y[4]
+                odr_end_pt = 9
+                coord_2D_rf = []
+
+                if isMonotonic(x) and isMonotonic(y) and isDistinct(x, y):
+                    for i in range(1, odr_end_pt):
+                        cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 1, (0, 0, 255), -1)
+                        cv2.putText(frame, str(i), (round(kp[0][i][0]), round(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX,
+                                    1.5, (0, 0, 255), 1, cv2.LINE_AA)
+                        kernel = kernel_choice(m, i, dx, dy)
+                        rf_x, rf_y = edge_refinement_conv(gray_frame, x[i], y[i], kernel)
+                        coord_2D_rf.append(np.array([rf_x, rf_y]))
+                        cv2.circle(frame, (rf_x, rf_y), 1, (0, 255, 0), -1)
+
+                    if coord_2D_rf:
+                        interval = []
+                        for i in range(1, 8):
+                            dis = np.linalg.norm(coord_2D_rf[i] - coord_2D_rf[i - 1])
+                            interval.append(dis)
+                        interval[1] /= 3
+                        interval[4] /= 3
+
+                        dis_std = np.std(interval)
+
+                        std_win.append(dis_std)
+
+                        odr_model = odr.Model(target_function)
+                        data = odr.Data(x[1:odr_end_pt], y[1:odr_end_pt])
+                        ordinal_distance_reg = odr.ODR(data, odr_model, beta0=[0., 1.])
+                        out = ordinal_distance_reg.run()
+                        loss = out.sum_square
+
+                        loss_win.append(loss)
+                        print(f"{mean(std_win):.2f}, {mean(loss_win):.2f}")
+                        # print(f"{len(loss_win)}: {dis_std:.2f}, {loss:.2f}")
+                        cv2.putText(frame, f'dist_std : {mean(std_win):.2f}', (800, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
+                                    (0, 0, 255), 1, cv2.LINE_AA)
+                        cv2.putText(frame, f'loss : {mean(loss_win):.2f}', (800, 150), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 1, cv2.LINE_AA)
+
+                        # cv2.putText(frame, f'dist_std : {dis_std:.2f}', (800, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
+                        #             (0, 0, 255), 1, cv2.LINE_AA)
+                        # cv2.putText(frame, f'loss : {loss:.2f}', (800, 150), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255),
+                        #     1, cv2.LINE_AA)
+
+                        if len(loss_win) == length:
+                            print(f"Final {mean(std_win):.2f}, {mean(loss_win):.2f}")
+
+            frameS = cv2.resize(frame, (1080, 810))
+            cv2.imshow('Window', frameS)
+            k = cv2.waitKey(30) & 0xFF
+            if k == 13:
+                loss_win = deque(maxlen=length)
+                std_win = deque(maxlen=length)
+                print('Reset')
+
+
+    Tis.Stop_pipeline()
+    cv2.destroyAllWindows()
+
+
+def target_function(p, x):
+    m, b = p
+    return m * x + b
 
 
 if __name__ == "__main__":
     model_keypoint_error()
     # aruco_accuracy_record()
     # multi_set_needle_refinement_accuracy_record()
-    # needle_refinement_accu       racy_record()
+    # needle_refinement_accuracy_record()
+    # FPS_test()
+    # bending_odr_std()

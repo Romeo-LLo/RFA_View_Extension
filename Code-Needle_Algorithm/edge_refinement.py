@@ -113,8 +113,8 @@ def detect_linear():
                 error_rf = round(error_rf, 2)
                 cv2.putText(frame, str(img), (20, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 1, cv2.LINE_AA)
                 cv2.putText(frame, str(error_rf), (coord_2D_rf[2][0], coord_2D_rf[2][1]), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 1, cv2.LINE_AA)
-                for corner in coord_2D_rf:
-                    frame[corner[1]][corner[0]+1] = (0, 0, 255)
+                # for corner in coord_2D_rf:
+                #     frame[corner[1]][corner[0]+1] = (0, 0, 255)
 
                 cv2.imshow('Window', frame)
                 cv2.waitKey(0)
@@ -141,8 +141,8 @@ def detect_linear_img():
                 coord_3D_rf, coord_2D_rf = edge_db_refinement_linear_display(frame, gray_frame, x, y, list(range(9)))
 
 
-                for corner in coord_2D_rf:
-                    frame[corner[1]][corner[0]+1] = (0, 0, 255)
+                # for corner in coord_2D_rf:
+                #     frame[corner[1]][corner[0]+1] = (0, 0, 255)
 
         cv2.imshow('Window', frame)
         cv2.waitKey(0)
@@ -188,7 +188,7 @@ def edge_refinement_linear_display(color_frame, gray_frame, x, y, plist):
         k = 0
         for j in range(closest_index-win+1, closest_index+win-1):
             coord_x, coord_y = gray_pt_set[j]
-            color_frame[coord_y][coord_x] = (0, norm_deriv[k], 0)
+            color_frame[coord_y][coord_x] = (0, 0, norm_deriv[k])
             k += 1
 
     return coord_3D_rf, coord_2D_rf
@@ -196,7 +196,7 @@ def edge_refinement_linear_display(color_frame, gray_frame, x, y, plist):
 
 
 def edge_db_refinement_linear_display(color_frame, gray_frame, x, y, plist):
-    win = 10
+    win = 30
 
     end_pts = end_pts_tip2end(x, y, gray_frame.shape)
     gray_pt_set = list(bresenham(end_pts[0][0], end_pts[0][1], end_pts[1][0], end_pts[1][1]))
@@ -219,6 +219,29 @@ def edge_db_refinement_linear_display(color_frame, gray_frame, x, y, plist):
         deriv_inspect = deriv_inspect_o[1:-1]
         # note that window out of range
         norm_deriv = 255 * (deriv_inspect - np.min(deriv_inspect)) / (np.max(deriv_inspect) - np.min(deriv_inspect))
+
+        fig, (ax, ax2) = plt.subplots(ncols=2, sharex=True)
+
+        pt_index = np.linspace(1, deriv_inspect_o.shape[0], deriv_inspect_o.shape[0])
+        ax.plot(pt_index, pixel_inspect, color='blue')
+        size = 12
+        # ax.set_xlabel('Points along the inspected segment', fontsize=size)
+        ax.set_ylabel('Pixel values', fontsize=size)
+        ax2.plot(pt_index, deriv_inspect_o, color='blue')
+        # ax2.set_xlabel('Points along the inspected segment', fontsize=size)
+        ax2.set_ylabel('Derivative of pixel values', fontsize=size)
+        plt.subplots_adjust(left=0.1,
+                            bottom=0.1,
+                            right=0.9,
+                            top=0.9,
+                            wspace=0.4,
+                            hspace=0.4)
+        ax.set_box_aspect(1)
+        ax2.set_box_aspect(1)
+        # plt.xlabel("Points along the inspected segment")
+        fig.text(0.5, 0.2, "Points along the inspected segment", ha='center', fontsize=size)
+
+        plt.show()
 
         kernel = kernel_choice(m, i, dx, dy)
         top = 4
@@ -252,7 +275,7 @@ def edge_db_refinement_linear_display(color_frame, gray_frame, x, y, plist):
         k = 0
         for j in range(closest_index-win+1, closest_index+win-1):
             coord_x, coord_y = gray_pt_set[j]
-            color_frame[coord_y][coord_x] = (0, norm_deriv[k], 0)
+            color_frame[coord_y][coord_x] = (0, 0, norm_deriv[k])
             k += 1
 
     return coord_3D_rf, coord_2D_rf
@@ -284,6 +307,9 @@ def edge_refinement_linear_mod2(gray_frame, x, y, plist):
         # note that window out of range
         kernel = kernel_choice(m, i, dx, dy)
         top = 4
+
+        if len(deriv_inspect) == 0:
+            return None, None
         if i % 2 == 0:
             # initial guess with highest deriv
             peak = np.argmax(deriv_inspect)

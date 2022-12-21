@@ -43,7 +43,8 @@ tip_off = 2.2
 def arucoboard_test():
     camera_matrix, dist_coefs = camera_para_retrieve()
     dictionary = aruco.Dictionary_get(aruco.DICT_4X4_1000)
-    board = aruco.CharucoBoard_create(5, 4, 4.5, 3.5, dictionary)
+    # board = aruco.CharucoBoard_create(5, 4, 4.5, 3.5, dictionary)
+    board = aruco.CharucoBoard_create(5, 4, 3.92, 3.05, dictionary)
 
     Tis = TIS.TIS()
     Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
@@ -345,6 +346,6 @@ def realtime_refinement_visual():
 
 
 if __name__ == "__main__":
-    # arucoboard_test()
-    realtime_refinement_visual()
+    arucoboard_test()
+    # realtime_refinement_visual()
     # realtime_error_snapshot()
