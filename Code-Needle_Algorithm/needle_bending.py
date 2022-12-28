@@ -10,7 +10,7 @@ from needle_utils import *
 import torch
 # from scipy import odr
 from scipy.odr import *
-
+from partial_filter import *
 from edge_refinement import *
 from collections import deque
 from statistics import mean, stdev
@@ -21,7 +21,7 @@ sys.path.insert(0, '/home/user/Desktop/PycharmProjects/RFA_View_Extension/RFA_Vi
 cfg = get_cfg()
 cfg.MODEL.DEVICE = "cuda"
 cfg.merge_from_file(model_zoo.get_config_file("COCO-Keypoints/keypoint_rcnn_R_50_FPN_3x.yaml"))
-cfg.MODEL.WEIGHTS = '../Model_path/model_1215.pth'
+cfg.MODEL.WEIGHTS = '../Model_path/model_1221.pth'
 cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7   # set a custom testing threshold
 cfg.TEST.DETECTIONS_PER_IMAGE = 1
 cfg.MODEL.ROI_KEYPOINT_HEAD.NUM_KEYPOINTS = 12
@@ -163,6 +163,11 @@ def bending_detect_mod():
                 x = kp[0, :-1, 0]
                 y = kp[0, :-1, 1]
 
+                for i in range(11):
+                    cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 1, (0, 0, 255), -1)
+                    cv2.putText(frame, str(i), (round(kp[0][i][0]), round(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX,
+                                1.5, (0, 0, 255), 1, cv2.LINE_AA)
+
                 m, b = line_polyfit(x, y)
                 dx = x[1] - x[4]
                 dy = y[1] - y[4]
@@ -170,15 +175,15 @@ def bending_detect_mod():
                 coord_2D_rf = []
 
                 if isMonotonic(x) and isMonotonic(y) and isDistinct(x, y):
-                    for i in range(1, odr_end_pt):
-                        cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 1, (0, 0, 255), -1)
-                        cv2.putText(frame, str(i), (round(kp[0][i][0]), round(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX,
-                                    1.5, (0, 0, 255), 1, cv2.LINE_AA)
-                        kernel = kernel_choice(m, i, dx, dy)
-                        print(i, kernel)
-                        rf_x, rf_y = edge_refinement_conv(gray_frame, x[i], y[i], kernel)
-                        coord_2D_rf.append(np.array([rf_x, rf_y]))
-                        cv2.circle(frame, (rf_x, rf_y), 1, (0, 255, 0), -1)
+                    # for i in range(1, odr_end_pt):
+                    #     cv2.circle(frame, (int(kp[0][i][0]), int(kp[0][i][1])), 1, (0, 0, 255), -1)
+                    #     cv2.putText(frame, str(i), (round(kp[0][i][0]), round(kp[0][i][1])), cv2.FONT_HERSHEY_SIMPLEX,
+                    #                 1.5, (0, 0, 255), 1, cv2.LINE_AA)
+                    #     kernel = kernel_choice(m, i, dx, dy)
+                    #     print(i, kernel)
+                    #     rf_x, rf_y = edge_refinement_conv(gray_frame, x[i], y[i], kernel)
+                    #     coord_2D_rf.append(np.array([rf_x, rf_y]))
+                    #     cv2.circle(frame, (rf_x, rf_y), 1, (0, 255, 0), -1)
 
                     if coord_2D_rf:
                         interval = []
@@ -265,15 +270,12 @@ def bending_mod():
 
             if isMonotonic(x) and isMonotonic(y) and isDistinct(x, y):
 
-                m, b = np.polyfit(x[1:odr_end_pt], y[1:odr_end_pt], 1)
-                odr_model = odr.Model(target_function)
-                data = odr.Data(x[1:odr_end_pt], y[1:odr_end_pt])
-                ordinal_distance_reg = odr.ODR(data, odr_model, beta0=[m, b])
-                out = ordinal_distance_reg.run()
-                out.pprint()
-                loss = out.sum_square
-                print(img, loss)
+                if kp_tensor.size(dim=0) != 0 or not torch.isnan(kp_tensor).all():
+                    kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+                    x = kp[0, :-1, 0]
+                    y = kp[0, :-1, 1]
 
+                    seq_x, seq_y, seq = partial_filter(x, y)
 
                 coord_3D_rf, coord_2D_rf = edge_refinement_linear_mod2(gray_frame, x, y, list(range(9)))
 
@@ -295,43 +297,56 @@ def bending_mod():
     # print(sum(stdList) / len(stdList))
     # print(max(stdList), min(stdList))
 
+def bending_partial():
 
-def test():
-    feature = np.array(np.arange(1, 11))
-    # shuffle the created array
-    # np.random.shuffle(feature)
-    # create a target array of random numbers
-    target = np.array([0.65, -.75, 0.90, -0.5, 0.14,
-                       0.84, 0.99, -0.95, 0.41, -0.28])
+    images = glob.glob(f'../All_images/TestImg1222/*.jpg')
+    for img in images:
+        frame = cv2.imread(img)
+        outputs = predictor(frame)
+        kp_tensor = outputs["instances"].pred_keypoints
+        if kp_tensor.size(dim=0) != 0 or not torch.isnan(kp_tensor).all():
 
-    # Define a function (quadratic in our case)
-    # to fit the data with.
-    # odr initially assumes a linear function
-    def target_function(p, x):
-        m, c = p
-        return m * x + c
+            kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+            x = kp[0, :-1, 0]
+            y = kp[0, :-1, 1]
 
-    #  model fitting.
-    odr_model = odr.Model(target_function)
+            seq_x, seq_y, seq = partial_filter(x, y)
+            if seq:
+                m, b = line_polyfit(seq_x, seq_y)
+                p1 = (0, round(b))
+                p2 = (1000, round(m * 1000 + b))
+                cv2.line(frame, p1, p2, (0, 0, 255), 1, cv2.LINE_AA)
 
-    # Create a Data object using sample data created.
-    data = odr.Data(feature, target)
+                odr_model = odr.Model(target_function)
+                data = odr.Data(seq_x, seq_y)
+                ordinal_distance_reg = odr.ODR(data, odr_model, beta0=[m, b])
+                out = ordinal_distance_reg.run()
+                loss = out.sum_square
+                m_, b_ = out.beta
+                manual_loss = 0
+                manual_loss2 = 0
 
-    # Set ODR with the model and data.
-    ordinal_distance_reg = odr.ODR(data, odr_model,
-                                   beta0=[0.2, 1.])
+                for k in range(len(seq)):
+                    cv2.circle(frame, (round(seq_x[k]), round(seq_y[k])), 1, (0, 255, 0), -1)
+                    cv2.putText(frame, str(seq[k]), (round(seq_x[k]), round(seq_y[k])), cv2.FONT_HERSHEY_SIMPLEX,
+                                1, (255, 0, 0), 1, cv2.LINE_AA)
+                    dis = np.absolute(m_*seq_x[k] - seq_y[k] + b_) / np.sqrt(m_*m_ + 1)
+                    manual_loss += dis
 
-    # Run the regression.
-    out = ordinal_distance_reg.run()
-    loss = out.sum_square
+                    # print(dis, d)
+                print(loss, manual_loss, manual_loss2)
 
-    # print the results
-    out.pprint()
-    print(loss)
+        frameS = cv2.resize(frame, (720, 540))
+        cv2.imshow('win', frameS)
+        cv2.waitKey()
+
+
+
+
 
 if __name__ == "__main__":
-    bending_detect_mod()
+    # bending_detect_mod()
     # bending_detect()
-
+    bending_partial()
     # bending_mod()
     # test()

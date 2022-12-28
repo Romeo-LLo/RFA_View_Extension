@@ -9,6 +9,7 @@ from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
 from needle_utils import *
 from Linear_equation import *
+from partial_filter import *
 from edge_refinement import *
 import torch
 import gi
@@ -23,7 +24,7 @@ cfg = get_cfg()
 
 cfg.MODEL.DEVICE = "cuda"
 cfg.merge_from_file(model_zoo.get_config_file("COCO-Keypoints/keypoint_rcnn_R_50_FPN_3x.yaml"))
-cfg.MODEL.WEIGHTS = '../Model_path/model_1201.pth'
+cfg.MODEL.WEIGHTS = '../Model_path/model_1227.pth'
 cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7   # set aq custom testing threshold
 cfg.TEST.DETECTIONS_PER_IMAGE = 1
 cfg.MODEL.ROI_KEYPOINT_HEAD.NUM_KEYPOINTS = 12
@@ -525,7 +526,7 @@ def bending_odr_std():
                         interval[4] /= 3
 
                         dis_std = np.std(interval)
-
+                        print(dis_std)
                         std_win.append(dis_std)
 
                         odr_model = odr.Model(target_function)
@@ -535,7 +536,7 @@ def bending_odr_std():
                         loss = out.sum_square
 
                         loss_win.append(loss)
-                        print(f"{mean(std_win):.2f}, {mean(loss_win):.2f}")
+                        # print(f"{mean(std_win):.2f}, {mean(loss_win):.2f}")
                         # print(f"{len(loss_win)}: {dis_std:.2f}, {loss:.2f}")
                         cv2.putText(frame, f'dist_std : {mean(std_win):.2f}', (800, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
                                     (0, 0, 255), 1, cv2.LINE_AA)
@@ -562,13 +563,82 @@ def bending_odr_std():
     cv2.destroyAllWindows()
 
 
+
+def bending_odr_partial():
+    Tis = TIS.TIS()
+    Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
+    Tis.Start_pipeline()
+    mtx, dist = camera_para_retrieve()
+    length = 15
+    loss_win = deque(maxlen=length)
+
+    while True:
+        if Tis.Snap_image(1) is True:
+            frame = Tis.Get_image()
+            frame = frame[:, :, :3]
+            dis_frame = np.array(frame)
+            frame = undistort_img(dis_frame, mtx, dist)
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            outputs = predictor(frame)
+            kp_tensor = outputs["instances"].pred_keypoints
+            if kp_tensor.size(dim=0) != 0 or not torch.isnan(kp_tensor).all():
+
+                kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+                x = kp[0, :-1, 0]
+                y = kp[0, :-1, 1]
+
+                seq_x, seq_y, seq = partial_filter(x, y)
+                if len(seq) >= 4:
+
+                    odr_model = odr.Model(target_function)
+                    data = odr.Data(seq_x, seq_y)
+                    ordinal_distance_reg = odr.ODR(data, odr_model, beta0=[0, 1])
+                    out = ordinal_distance_reg.run()
+                    m_, b_ = out.beta
+                    manual_loss = 0
+
+                    for k in range(len(seq)):
+                        cv2.circle(frame, (round(seq_x[k]), round(seq_y[k])), 1, (0, 255, 0), -1)
+                        cv2.putText(frame, str(seq[k]), (round(seq_x[k]), round(seq_y[k])), cv2.FONT_HERSHEY_SIMPLEX,
+                                    1, (255, 0, 0), 1, cv2.LINE_AA)
+
+                        dis = np.absolute(m_ * seq_x[k] - seq_y[k] + b_) / np.sqrt(m_ * m_ + 1)
+                        manual_loss += dis
+                    manual_loss /= len(seq)
+
+                    cv2.putText(frame, f'{manual_loss:.2f}', (800, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.5,
+                                (0, 0, 255), 1, cv2.LINE_AA)
+                    loss_win.append(manual_loss)
+                    p1 = (0, round(b_))
+                    p2 = (1000, round(m_ * 1000 + b_))
+                    cv2.line(frame, p1, p2, (0, 0, 255), 1, cv2.LINE_AA)
+
+            if len(loss_win) == length:
+                print(f"Final: {mean(loss_win):.4f}")
+                loss_win = deque(maxlen=length)
+
+            frameS = cv2.resize(frame, (1080, 810))
+            cv2.imshow('Window', frameS)
+            k = cv2.waitKey(30) & 0xFF
+            if k == 13:
+                loss_win = deque(maxlen=length)
+                print('Reset')
+
+
+    Tis.Stop_pipeline()
+    cv2.destroyAllWindows()
+
+
 def target_function(p, x):
     m, b = p
     return m * x + b
 
 
 if __name__ == "__main__":
-    model_keypoint_error()
+    # model_keypoint_error()
+    # bending_odr_partial()
+    bending_odr_std()
     # aruco_accuracy_record()
     # multi_set_needle_refinement_accuracy_record()
     # needle_refinement_accuracy_record()
