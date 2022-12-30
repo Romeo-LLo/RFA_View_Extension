@@ -302,17 +302,19 @@ def edge_refinement_linear_mod2(gray_frame, x, y, plist):
     for i in plist:
         rough_coord = (x[i], y[i])
         closest_index = find_closest_edge(gray_pt_set, rough_coord)
-        deriv_inspect_o = d_pixel[closest_index - win: closest_index + win]
-        deriv_inspect = deriv_inspect_o[1:-1]
-        # note that window out of range
-        kernel = kernel_choice(m, i, dx, dy)
-        top = 4
+        lower_bound = max(closest_index - win, 0)
+        upper_bound = min(closest_index + win, len(gray_pt_set))
 
-        if len(deriv_inspect) == 0:
-            return None, None
+        deriv_inspect_o = d_pixel[lower_bound: upper_bound]
+        deriv_inspect = deriv_inspect_o[1:-1]
+        kernel = kernel_choice(m, i, dx, dy)
+        top = 3
+        # if len(deriv_inspect) == 0:
+        #     return None, None
         if i % 2 == 0:
             # initial guess with highest deriv
             peak = np.argmax(deriv_inspect)
+            # check top few with template matching, extract indice of them
             indice = np.argpartition(deriv_inspect, -top)[-top:]
 
         else:
@@ -326,6 +328,11 @@ def edge_refinement_linear_mod2(gray_frame, x, y, plist):
         for idx in indice:
             pt = gray_pt_set[closest_index - win + idx + 1]
             region = cropArea(gray_frame, pt[0], pt[1])
+
+            # on the boundary, use the max deriv, skip this point
+            if region.shape != kernel.shape:
+                break
+
             inner_product = (kernel * region).sum()
             if inner_product > max_prod:
                 peak_inspect = idx

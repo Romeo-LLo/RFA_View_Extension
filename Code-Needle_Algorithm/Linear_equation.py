@@ -138,9 +138,10 @@ def scale_estimation_multi_mod(q1, q2, q3, d1, d2, mtx, tip_offset):
     tip = p1 - unit * tip_offset
     end = p1 + unit * (30 - tip_offset)
 
+    ext_tip = p1 - unit * 10
+    ext_end = p1 + unit * 30
 
-
-    return tip, end
+    return tip, end, ext_tip, ext_end
 
 
 def scale_estimation_multi(q1, q2, q3, d1, d2, mtx, tip_offset):

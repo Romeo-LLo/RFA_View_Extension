@@ -33,7 +33,7 @@ def manual_record():
 
             if est_state:
 
-                outputPath = '../All_images/TestImg1222'
+                outputPath = '../All_images'
                 ts = datetime.datetime.now()
                 filename = "{}.jpg".format(ts.strftime("%M-%S"))
                 path = os.path.sep.join((outputPath, filename))

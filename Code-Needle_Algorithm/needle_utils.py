@@ -512,6 +512,17 @@ def isDistinct(x, y):
     thres = 20
     return all(math.sqrt((x[i] - x[i+1])**2 + (y[i] - y[i+1])**2) > thres for i in range(len(x) - 1))
 
+def bufferBoarder(x, y, cursor):
+    w, h = 1428, 1065
+    buffer = 20
+
+    # input x, y is a single coordinate
+    if x > buffer and x < w - buffer and y > buffer and y < h - buffer:
+        return True
+
+    return False
+
+
 def error_calc(tip_t, end_t, tip, end):
 
     uv_t = (tip_t - end_t) / np.linalg.norm(tip_t - end_t)
@@ -603,4 +614,16 @@ def pose_trans_needle(tvec, rvec):
 
     return tip, end
 
+
+def line_define(x, beta):
+    m, b = beta
+
+    x_min = int(min(x))
+    x_max = int(max(x))
+    y_min = int(m * x_min + b)
+    y_max = int(m * x_max + b)
+
+    end_pts = [(x_min, y_min), (x_max, y_max)]
+
+    return end_pts
 
