@@ -31,6 +31,7 @@ cfg.TEST.KEYPOINT_OKS_SIGMAS = np.ones((12, 1), dtype=float).tolist()
 predictor = DefaultPredictor(cfg)
 
 num_steps = 2
+num_lines = 2
 
 
 def setup_plot():
@@ -47,8 +48,8 @@ def setup_plot():
 
 
     color = ['red', 'green']
-    line3D = ax3D.plot([], [], [], color[0], label='Needle trajectory')[0]
-    line2D = ax2D.plot([], [], color[0])[0]
+    line3D = ax3D.plot([], [], [], color[0], linewidth=1)[0]
+    line2D = [ax2D.plot([], [], color[0], linewidth=1)[0] for i in range(num_lines)]
 
     sq_len = 15
     shallow = 0
@@ -66,21 +67,23 @@ def setup_plot():
     us_zone = 17
     us_x, us_z = np.meshgrid(range(-us_zone-4, us_zone-4), range(-us_zone, us_zone))
     us_y = np.full((2 * us_zone, 2 * us_zone), shallow)
-    ax3D.plot_surface(us_x, us_y, us_z, alpha=0.5, label='Ultrasound plane')
+    ax3D.plot_surface(us_x, us_y, us_z, alpha=0.5)
 
     sq_len = 30
     ax2D.set_xlabel('X')
     ax2D.set_ylabel('Y')
     ax2D.set_xlim(-sq_len, sq_len)
     ax2D.set_ylim(-sq_len, sq_len)
-    ax2D.set_yticklabels([])
-    ax2D.set_xticklabels([])
+    # ax2D.set_yticklabels([])
+    # ax2D.set_xticklabels([])
 
 
     us_img = plt.imread('../All_images/ultrasound_show.png')
     ax2D.imshow(us_img, extent=[-sq_len, sq_len, -sq_len, sq_len])
 
     return fig, plt, ax3D, ax2D, line3D, line2D
+
+
 
 def realtime_hybrid_visual():
 
@@ -171,7 +174,8 @@ def realtime_hybrid_visual_partial():
         if Tis.Snap_image(1) is True:
 
             traj3D = np.zeros((num_steps, 3))
-            traj2D = np.zeros((num_steps, 2))
+            traj2D = np.zeros((num_lines, num_steps, 2))
+            linewidth = 1
 
             frame = Tis.Get_image()
             frame = frame[:, :, :3]
@@ -212,16 +216,20 @@ def realtime_hybrid_visual_partial():
                         coord_3D_rf, coord_2D_rf = edge_refinement_linear_mod2(gray_frame, x, y, plist)
                         tip_rf, end_rf, ext_tip, ext_end = scale_estimation_multi_mod(coord_3D_rf[0], coord_3D_rf[1], coord_3D_rf[2], dlist[0],
                                                           dlist[1], mtx, offset)
-                        # traj3D = np.array([ext_tip, ext_end])
-                        # traj2D = np.array([ext_tip[:2], ext_end[:2]])
+                        traj3D = np.array([ext_tip, ext_end])
+                        linewidth = 9 - len(seq)
+                        tip_up2D, tip_low2D, end_up2D, end_low2D = parallel_line_pts(ext_tip, ext_end, linewidth)
+                        traj2D[0] = np.array([tip_up2D, end_up2D])
+                        traj2D[1] = np.array([tip_low2D, end_low2D])
 
-                        traj3D = predicted_zone(ext_tip, ext_end)
 
-            line3D.set_data(traj3D[0], traj3D[2])
-            line3D.set_3d_properties(-traj3D[1])
-            # line3D.set_data(traj3D[:, 0], traj3D[:, 2])
-            # line3D.set_3d_properties(-traj3D[:, 1])
-            line2D.set_data(-traj2D[:, 0], -traj2D[:, 1])
+            ax3D.lines[0].set_linewidth(linewidth)
+
+            line3D.set_data(traj3D[:, 0], traj3D[:, 2])
+            line3D.set_3d_properties(-traj3D[:, 1])
+            line2D[0].set_data(-traj2D[0][:, 0], -traj2D[0][:, 1])
+            line2D[1].set_data(-traj2D[1][:, 0], -traj2D[1][:, 1])
+
 
             fig.canvas.draw()
             fig.canvas.flush_events()
@@ -237,40 +245,9 @@ def realtime_hybrid_visual_partial():
     Tis.Stop_pipeline()
     cv2.destroyAllWindows()
 
-def predicted_zone(tip, end):
-    tip = np.array([1, 3, 2])
-    end = np.array([8, 5, 9])
-    R = 5
-    # vector in direction of axis
-    v = tip - end
-    # find magnitude of vector
-    mag = norm(v)
-    # unit vector in direction of axis
-    v = v / mag
-    # make some vector not in the same direction as v
-    not_v = np.array([1, 0, 0])
-    if (v == not_v).all():
-        not_v = np.array([0, 1, 0])
-    # make vector perpendicular to v
-    n1 = np.cross(v, not_v)
-    # normalize n1
-    n1 /= norm(n1)
-    # make unit vector perpendicular to v and n1
-    n2 = np.cross(v, n1)
-    # surface ranges over t from 0 to length of axis and 0 to 2*pi
-    t = np.linspace(0, mag, 10)
-    theta = np.linspace(0, 2 * np.pi, 10)
-    # use meshgrid to make 2d arrays
-    t, theta = np.meshgrid(t, theta)
-    # generate coordinates for surface
-    traj3D = [tip[i] + v[i] * t + R * np.sin(theta) * n1[i] + R * np.cos(theta) * n2[i] for i in [0, 1, 2]]
-    print(traj3D[0], traj3D[1], traj3D[2])
-    print(traj3D[0].shape, traj3D[1].shape, traj3D[2].shape)
-    return traj3D
 
 
 if __name__ == "__main__":
     # realtime_hybrid_visual()
-    # realtime_hybrid_visual_partial()
+    realtime_hybrid_visual_partial()
     # predicted_zone(1, 2)
-    test()

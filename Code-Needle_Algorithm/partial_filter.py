@@ -107,6 +107,7 @@ cand = {
 }
 
 def partial_filter(x, y):
+    # retrieve reasonable segment of the predicted list
     valid_seq = []
     cand_seq = []  # save to buffer for comparison
     cursor = 1

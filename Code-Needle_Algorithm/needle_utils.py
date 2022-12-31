@@ -616,6 +616,7 @@ def pose_trans_needle(tvec, rvec):
 
 
 def line_define(x, beta):
+    # draw partial line only on the tracking points
     m, b = beta
 
     x_min = int(min(x))
@@ -627,3 +628,16 @@ def line_define(x, beta):
 
     return end_pts
 
+def parallel_line_pts(tip, end, linewidth):
+    m = (tip[1] - end[1]) / (tip[0] - end[0])
+
+
+    norm = linewidth / np.sqrt((1 + m * m))
+    offset_vec = [-m * norm, norm]
+    tip_up2D = tip[:2] + offset_vec
+    tip_low2D = tip[:2] - offset_vec
+    end_up2D = end[:2] + offset_vec
+    end_low2D = end[:2] - offset_vec
+
+
+    return tip_up2D, tip_low2D, end_up2D, end_low2D
