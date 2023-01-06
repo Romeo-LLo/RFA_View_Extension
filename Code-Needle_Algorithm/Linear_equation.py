@@ -115,6 +115,9 @@ def scale_estimation_multi_mod(q1, q2, q3, d1, d2, mtx, tip_offset):
     b3 = np.dot(v3, B)
 
     S = np.array([[d2*a1, -d1*a2-d2*a2, d1*a3], [d2*b1, -d1*b2-d2*b2, d1*b3]])
+    if np.isnan(S).any() or np.isinf(S).any():
+        print(S)
+
     ns = null_space(S)
 
     #check

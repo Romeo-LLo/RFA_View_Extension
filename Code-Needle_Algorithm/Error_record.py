@@ -19,6 +19,9 @@ import time
 
 from collections import deque
 from statistics import mean, stdev
+
+mtx, dist = camera_para_retrieve()
+
 gi.require_version("Gst", "1.0")
 cfg = get_cfg()
 
@@ -634,13 +637,100 @@ def target_function(p, x):
     m, b = p
     return m * x + b
 
+def detection_rate():
+    Tis = TIS.TIS()
+    Tis.openDevice("23224102", 1440, 1080, "30/1", TIS.SinkFormats.BGRA, True)
+    Tis.Start_pipeline()
+    detected_count = 0
+    whole_count = 0
+    initial = True
+    while True:
+        if Tis.Snap_image(1) is True:
+            frame = Tis.Get_image()
+            frame = frame[:, :, :3]
+            dis_frame = np.array(frame)
+            frame = undistort_img(dis_frame, mtx, dist)
+
+            diamondCorners, rvec, tvec = diamond_detection(dis_frame, mtx, dist)
+            # if diamondCorners:
+            #     if initial:
+            #         initial = False
+            #         print(f'{tvec[0][0][2]:.2f}')
+            #     cv2.aruco.drawAxis(frame, mtx, dist, rvec, tvec, 1)
+            #     detected_count += 1
+
+
+
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            outputs = predictor(frame)
+            kp_tensor = outputs["instances"].pred_keypoints
+            if kp_tensor.size(dim=0) != 0 and not torch.isnan(kp_tensor).any():
+                kp = outputs["instances"].pred_keypoints.to("cpu").numpy()  # x, y, score
+                x = kp[0, :-1, 0]
+                y = kp[0, :-1, 1]
+
+                seq_x, seq_y, seq, beta = partial_filter(x, y)
+                if len(seq) >= 4:
+
+                    plist, dlist, offset = pdlist_choosen_multi(seq)
+                    if plist and dlist:
+                        refine_plist = plist[0] + plist[1]
+                        coord_3D_rf, coord_2D_rf = edge_refinement_linear_mod2(gray_frame, x, y, refine_plist)
+                        tip_rf, end_rf, ext_tip, ext_end = scale_estimation_multi_mod(coord_3D_rf[0],
+                                                                                      coord_3D_rf[1],
+                                                                                      coord_3D_rf[2], dlist[0][0],
+                                                                                      dlist[0][1], mtx, offset[0])
+                        tip_rf2, end_rf2, ext_tip2, ext_end2 = scale_estimation_multi_mod(coord_3D_rf[3],
+                                                                                          coord_3D_rf[4],
+                                                                                          coord_3D_rf[5],
+                                                                                          dlist[1][0],
+                                                                                          dlist[1][1], mtx,
+                                                                                          offset[1])
+                        tip_diff = np.linalg.norm(tip_rf - tip_rf2)
+
+                        if tip_diff < 1 + 0.5 * (8 - len(seq)):
+                            if initial:
+                                initial = False
+                                print(f'{tip_rf}')
+                            detected_count += 1
+
+                            # draw
+                            endpts = line_define(seq_x, beta)
+                            cv2.line(frame, endpts[0], endpts[1], (0, 0, 255), 2, cv2.LINE_AA)
+                            for k in range(len(coord_2D_rf)):
+                                cv2.circle(frame, (coord_2D_rf[k][0], coord_2D_rf[k][1]), 5, (0, 255, 0), -1)
+                                cv2.putText(frame, str(refine_plist[k]), (coord_2D_rf[k][0], coord_2D_rf[k][1]),
+                                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1, cv2.LINE_AA)
+
+            whole_count += 1
+
+            if whole_count >= 100:
+                print(f'{detected_count / whole_count:.2f}')
+                detected_count = 0
+                whole_count = 0
+                initial = True
+
+            frameS = cv2.resize(frame, (1080, 810))
+            cv2.imshow('Window', frameS)
+
+            k = cv2.waitKey(30) & 0xFF
+            if k == 13:
+                detected_count = 0
+                whole_count = 0
+                initial = True
+                print('Reset')
+
+    Tis.Stop_pipeline()
+    cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     # model_keypoint_error()
     # bending_odr_partial()
-    bending_odr_std()
+    # bending_odr_std()
     # aruco_accuracy_record()
     # multi_set_needle_refinement_accuracy_record()
     # needle_refinement_accuracy_record()
     # FPS_test()
     # bending_odr_std()
+    detection_rate()

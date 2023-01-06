@@ -309,8 +309,9 @@ def edge_refinement_linear_mod2(gray_frame, x, y, plist):
         deriv_inspect = deriv_inspect_o[1:-1]
         kernel = kernel_choice(m, i, dx, dy)
         top = 3
-        # if len(deriv_inspect) == 0:
-        #     return None, None
+        if len(deriv_inspect) == 0:
+            return None, None
+
         if i % 2 == 0:
             # initial guess with highest deriv
             peak = np.argmax(deriv_inspect)

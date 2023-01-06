@@ -106,6 +106,61 @@ cand = {
     },
 }
 
+lazer = 1.036
+multi_cand = {
+  148: {
+        "first": 1,
+        "second": 4,
+        "third": 8,
+        "plist": [[1, 4, 8], [2, 5, 7]],
+        "dlist": [[50/lazer, 60/lazer], [50/lazer, 40/lazer]],
+        "offset": [2.3, 3.2]
+    },
+    147: {
+        "first": 1,
+        "second": 4,
+        "third": 7,
+        "plist": [[1, 4, 7], [2, 5, 6]],
+        "dlist": [[50/lazer, 50/lazer], [50/lazer, 30/lazer]],
+        "offset": [2.3, 3.2]
+    },
+    146: {
+        "first": 1,
+        "second": 4,
+        "third": 6,
+        "plist": [[1, 4, 6], [2, 3, 5]],
+        "dlist": [[50/lazer, 40/lazer], [30/lazer, 20/lazer]],
+        "offset": [2.3, 3.2]
+    },
+    135: {
+        "first": 1,
+        "second": 3,
+        "third": 5,
+        "plist": [[1, 3, 5], [2, 3, 5]],
+        "dlist": [[40/lazer, 20/lazer], [30/lazer, 20/lazer]],
+        "offset": [2.3, 3.2]
+    },
+
+    358: {
+        "first": 3,
+        "second": 5,
+        "third": 8,
+        "plist": [[3, 5, 8], [3, 6, 8]],
+        "dlist": [[20 / lazer, 50 / lazer], [50 / lazer, 20 / lazer]],
+        "offset": [6.1, 6.1]
+    },
+
+    468: {
+        "first": 4,
+        "second": 6,
+        "third": 8,
+        "plist": [[4, 6, 8], [5, 6, 8]],
+        "dlist": [[40 / lazer, 20 / lazer], [30 / lazer, 20 / lazer]],
+        "offset": [7.05, 8]
+    }
+
+}
+
 def partial_filter(x, y):
     # retrieve reasonable segment of the predicted list
     valid_seq = []
@@ -114,7 +169,7 @@ def partial_filter(x, y):
     while cursor < 6:
         x_cont = x[cursor: cursor+4]
         y_cont = y[cursor: cursor+4]
-        if isMonotonic(x_cont) and isMonotonic(y_cont)and isDistinct(x_cont, y_cont) and bufferBoarder(x[cursor+3], y[cursor+3], cursor+3):
+        if isMonotonic(x_cont) and isMonotonic(y_cont) and isDistinct(x_cont, y_cont) and bufferBoarder(x[cursor+3], y[cursor+3], cursor+3):
             # valid_seq is empty
             if not valid_seq:
                 valid_seq.append(cursor)
@@ -147,6 +202,8 @@ def partial_filter(x, y):
 
     return seq_x, seq_y, seq, decision[1]
 
+
+
 def pdlist_choosen(seq):
     plist = []
     dlist = []
@@ -159,7 +216,20 @@ def pdlist_choosen(seq):
             dlist = [d / lazer for d in dlist]
             offset = value['offset']
             break
+    return plist, dlist, offset
 
+
+def pdlist_choosen_multi(seq):
+    plist = []
+    dlist = []
+    offset = 0
+    # for key, value in cand.items():
+    for key, value in multi_cand.items():
+        if value["first"] == seq[0] and value["third"] == seq[-1]:
+            plist = value["plist"]
+            dlist = value["dlist"]
+            offset = value['offset']
+            break
     return plist, dlist, offset
 
 

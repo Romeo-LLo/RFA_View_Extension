@@ -594,16 +594,18 @@ def pose_trans_needle(tvec, rvec):
 
     r_matrix, _ = cv2.Rodrigues(rvec[0][0])
 
-    # offset_tip = np.array([ -0.62134536, -20.31548482  -2.80522987])
 
     # 12 / 11 original tool
     # offset_tip = [-0.10867995, -20.48369757,  -3.75519427]
     # offset_end = [0, 0, -2.5]
 
     # the DIY needle offset
-    offset_tip = np.array([0.38586773, -19.75394137, -2.30275252])
-    offset_end = np.array([-0.2734269, 9.92622178, -1.63618984])
+    # offset_tip = np.array([0.38586773, -19.75394137, -2.30275252])
+    # offset_end = np.array([-0.2734269, 9.92622178, -1.63618984])
 
+    # add extra length on y to simulate extended tip and end
+    offset_tip = np.array([0.38586773, -27.75394137, -2.30275252])
+    offset_end = np.array([-0.2734269, 12.92622178, -1.63618984])
 
     tip_trans = np.matmul(offset_tip, r_matrix.T)
 
